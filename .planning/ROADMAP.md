@@ -91,6 +91,11 @@ Plans:
 4. Refresh automático se ejecuta en apertura/reentrada del plugin para bloques soportados.
 5. Usuario entiende claramente si la última sincronización fue exitosa o falló.
 
+**Plans:** 0/1 plans complete
+
+Plans:
+- [ ] `04-01-PLAN.md` — Bloque canvas nativo con metadatos visibles y sync manual/auto in-place
+
 ## Traceability Validation
 
 - v1 requirements total: 15
