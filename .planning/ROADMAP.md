@@ -9,7 +9,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 1 | Foundations & URL Intake | Crear base técnica del plugin y flujo de ingestión de URL | SRC-01, SRC-02, SRC-03 | 3 |
+| 1 | Foundations & URL Intake | Complete (2026-03-02) | SRC-01, SRC-02, SRC-03 | 3 |
 | 2 | Private Access with PAT | Soportar repos privados con autenticación PAT robusta | AUTH-01, AUTH-02, AUTH-03 | 3 |
 | 3 | Render Engine | Render correcto de código, Markdown y Mermaid con objetivo <2s | RND-01, RND-02, RND-03, RND-04 | 4 |
 | 4 | Canvas UX & Sync | Entrega de bloque nativo en canvas con refresco manual/automático | CVS-01, CVS-02, SNC-01, SNC-02, SNC-03 | 5 |
@@ -28,10 +28,10 @@
 2. URLs inválidas producen errores claros con acción sugerida.
 3. Tipos de archivo soportados en v1 se detectan correctamente y enrutan al pipeline adecuado.
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] `01-01-PLAN.md` — Contrato de ingestión URL (parse + validate + detect) con cobertura SRC-01/02/03
+- [x] `01-01-PLAN.md` — Contrato de ingestión URL (parse + validate + detect) con cobertura SRC-01/02/03
 
 ## Phase 2: Private Access with PAT
 
