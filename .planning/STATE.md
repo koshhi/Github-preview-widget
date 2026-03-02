@@ -34,10 +34,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-02)
 
 ## Session Continuity
 
-- Stopped at: Completed 01-01-PLAN.md and verified phase 1
-- Resume file: `None`
-- Next command: `$gsd-discuss-phase 2`
-- Alternative: `$gsd-plan-phase 2`
+- Stopped at: Phase 2 context gathered
+- Resume file: `.planning/phases/02-private-access-with-pat/02-CONTEXT.md`
+- Next command: `$gsd-plan-phase 2`
+- Alternative: `$gsd-plan-phase 2 --skip-research`
 
 ---
 *Last updated: 2026-03-02 after project initialization*
