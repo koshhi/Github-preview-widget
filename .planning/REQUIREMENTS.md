@@ -19,10 +19,10 @@
 
 ### Rendering
 
-- [ ] **RND-01**: Archivo de texto/código se renderiza con resaltado de sintaxis básico según extensión.
-- [ ] **RND-02**: Markdown se renderiza correctamente (títulos, listas, tablas, enlaces, bloques de código).
-- [ ] **RND-03**: Bloques Mermaid en Markdown se renderizan como diagrama en la preview.
-- [ ] **RND-04**: Primer render de un archivo dentro de límites de tamaño definidos ocurre en menos de 2 segundos.
+- [x] **RND-01**: Archivo de texto/código se renderiza con resaltado de sintaxis básico según extensión.
+- [x] **RND-02**: Markdown se renderiza correctamente (títulos, listas, tablas, enlaces, bloques de código).
+- [x] **RND-03**: Bloques Mermaid en Markdown se renderizan como diagrama en la preview.
+- [x] **RND-04**: Primer render de un archivo dentro de límites de tamaño definidos ocurre en menos de 2 segundos.
 
 ### Canvas Embed
 
@@ -71,10 +71,10 @@
 | AUTH-01 | Phase 2 | Complete |
 | AUTH-02 | Phase 2 | Complete |
 | AUTH-03 | Phase 2 | Complete |
-| RND-01 | Phase 3 | Pending |
-| RND-02 | Phase 3 | Pending |
-| RND-03 | Phase 3 | Pending |
-| RND-04 | Phase 3 | Pending |
+| RND-01 | Phase 3 | Complete |
+| RND-02 | Phase 3 | Complete |
+| RND-03 | Phase 3 | Complete |
+| RND-04 | Phase 3 | Complete |
 | CVS-01 | Phase 4 | Pending |
 | CVS-02 | Phase 4 | Pending |
 | SNC-01 | Phase 4 | Pending |
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after initial definitio
+*Last updated: 2026-03-02 after initial de

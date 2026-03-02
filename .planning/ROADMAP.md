@@ -11,7 +11,7 @@
 |---|-------|------|--------------|------------------|
 | 1 | Foundations & URL Intake | Complete (2026-03-02) | SRC-01, SRC-02, SRC-03 | 3 |
 | 2 | Private Access with PAT | Complete (2026-03-02) | AUTH-01, AUTH-02, AUTH-03 | 3 |
-| 3 | Render Engine | Render correcto de código, Markdown y Mermaid con objetivo <2s | RND-01, RND-02, RND-03, RND-04 | 4 |
+| 3 | Render Engine | Complete (2026-03-02) | RND-01, RND-02, RND-03, RND-04 | 4 |
 | 4 | Canvas UX & Sync | Entrega de bloque nativo en canvas con refresco manual/automático | CVS-01, CVS-02, SNC-01, SNC-02, SNC-03 | 5 |
 
 ## Phase 1: Foundations & URL Intake
@@ -68,10 +68,10 @@ Plans:
 3. Bloques Mermaid se transforman en diagramas visibles o fallback controlado si fallan.
 4. Primer render cumple objetivo de <2s bajo límites de tamaño definidos.
 
-**Plans:** 0/1 plans complete
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] `03-01-PLAN.md` — Pipeline de render para código/markdown/mermaid con fallback controlado y objetivo <2s
+- [x] `03-01-PLAN.md` — Pipeline de render para código/markdown/mermaid con fallback controlado y objetivo <2s
 
 ## Phase 4: Canvas UX & Sync
 
@@ -99,4 +99,4 @@ Plans:
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-02 after phase 2 execution*
+*Last updated: 2026-03-02 after phase 3 execution*
