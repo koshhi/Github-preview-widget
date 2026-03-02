@@ -12,7 +12,7 @@
 | 1 | Foundations & URL Intake | Complete (2026-03-02) | SRC-01, SRC-02, SRC-03 | 3 |
 | 2 | Private Access with PAT | Complete (2026-03-02) | AUTH-01, AUTH-02, AUTH-03 | 3 |
 | 3 | Render Engine | Complete (2026-03-02) | RND-01, RND-02, RND-03, RND-04 | 4 |
-| 4 | Canvas UX & Sync | Entrega de bloque nativo en canvas con refresco manual/automático | CVS-01, CVS-02, SNC-01, SNC-02, SNC-03 | 5 |
+| 4 | Canvas UX & Sync | Complete (2026-03-02) | CVS-01, CVS-02, SNC-01, SNC-02, SNC-03 | 5 |
 
 ## Phase 1: Foundations & URL Intake
 
@@ -91,10 +91,10 @@ Plans:
 4. Refresh automático se ejecuta en apertura/reentrada del plugin para bloques soportados.
 5. Usuario entiende claramente si la última sincronización fue exitosa o falló.
 
-**Plans:** 0/1 plans complete
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] `04-01-PLAN.md` — Bloque canvas nativo con metadatos visibles y sync manual/auto in-place
+- [x] `04-01-PLAN.md` — Bloque canvas nativo con metadatos visibles y sync manual/auto in-place
 
 ## Traceability Validation
 
@@ -104,4 +104,4 @@ Plans:
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-02 after phase 3 execution*
+*Last updated: 2026-03-02 after phase 4 execution*

@@ -26,14 +26,14 @@
 
 ### Canvas Embed
 
-- [ ] **CVS-01**: Bloque embebido en canvas mantiene estilo limpio y consistente con apariencia nativa de Figma.
-- [ ] **CVS-02**: Bloque muestra metadatos mínimos (origen y estado de última sincronización).
+- [x] **CVS-01**: Bloque embebido en canvas mantiene estilo limpio y consistente con apariencia nativa de Figma.
+- [x] **CVS-02**: Bloque muestra metadatos mínimos (origen y estado de última sincronización).
 
 ### Sync
 
-- [ ] **SNC-01**: Usuario puede refrescar manualmente el bloque embebido.
-- [ ] **SNC-02**: Plugin ejecuta refresco automático en apertura/reentrada del plugin para bloques compatibles.
-- [ ] **SNC-03**: Resultado de refresco (éxito/error) queda visible para el usuario.
+- [x] **SNC-01**: Usuario puede refrescar manualmente el bloque embebido.
+- [x] **SNC-02**: Plugin ejecuta refresco automático en apertura/reentrada del plugin para bloques compatibles.
+- [x] **SNC-03**: Resultado de refresco (éxito/error) queda visible para el usuario.
 
 ## v2 Requirements
 
@@ -75,11 +75,11 @@
 | RND-02 | Phase 3 | Complete |
 | RND-03 | Phase 3 | Complete |
 | RND-04 | Phase 3 | Complete |
-| CVS-01 | Phase 4 | Pending |
-| CVS-02 | Phase 4 | Pending |
-| SNC-01 | Phase 4 | Pending |
-| SNC-02 | Phase 4 | Pending |
-| SNC-03 | Phase 4 | Pending |
+| CVS-01 | Phase 4 | Complete |
+| CVS-02 | Phase 4 | Complete |
+| SNC-01 | Phase 4 | Complete |
+| SNC-02 | Phase 4 | Complete |
+| SNC-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after initial de
+*Last updated: 2026-03-02 after phase 4 execution*
