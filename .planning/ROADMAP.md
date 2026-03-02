@@ -47,6 +47,11 @@ Plans:
 2. Archivo en repo privado se descarga correctamente con PAT válido.
 3. Errores por token inválido/sin permisos se muestran de forma comprensible.
 
+**Plans:** 0/1 plans complete
+
+Plans:
+- [ ] `02-01-PLAN.md` — Flujo de acceso público/privado con PAT por fichero, retry=1 y UX de errores AUTH-01/02/03
+
 ## Phase 3: Render Engine
 
 **Goal:** Entregar render correcto y rápido de contenido técnico (texto/código/markdown/mermaid).
