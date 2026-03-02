@@ -13,9 +13,9 @@
 
 ### Access & Auth
 
-- [ ] **AUTH-01**: Usuario puede configurar un GitHub PAT para acceso a repos privados.
-- [ ] **AUTH-02**: Plugin puede leer archivo de repositorio privado con PAT válido sin errores de autenticación.
-- [ ] **AUTH-03**: Plugin muestra estado de error claro para PAT ausente, inválido o sin permisos.
+- [x] **AUTH-01**: Usuario puede configurar un GitHub PAT para acceso a repos privados.
+- [x] **AUTH-02**: Plugin puede leer archivo de repositorio privado con PAT válido sin errores de autenticación.
+- [x] **AUTH-03**: Plugin muestra estado de error claro para PAT ausente, inválido o sin permisos.
 
 ### Rendering
 
@@ -68,9 +68,9 @@
 | SRC-01 | Phase 1 | Complete |
 | SRC-02 | Phase 1 | Complete |
 | SRC-03 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
-| AUTH-02 | Phase 2 | Pending |
-| AUTH-03 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
+| AUTH-02 | Phase 2 | Complete |
+| AUTH-03 | Phase 2 | Complete |
 | RND-01 | Phase 3 | Pending |
 | RND-02 | Phase 3 | Pending |
 | RND-03 | Phase 3 | Pending |

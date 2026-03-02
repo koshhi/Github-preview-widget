@@ -10,7 +10,7 @@
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
 | 1 | Foundations & URL Intake | Complete (2026-03-02) | SRC-01, SRC-02, SRC-03 | 3 |
-| 2 | Private Access with PAT | Soportar repos privados con autenticación PAT robusta | AUTH-01, AUTH-02, AUTH-03 | 3 |
+| 2 | Private Access with PAT | Complete (2026-03-02) | AUTH-01, AUTH-02, AUTH-03 | 3 |
 | 3 | Render Engine | Render correcto de código, Markdown y Mermaid con objetivo <2s | RND-01, RND-02, RND-03, RND-04 | 4 |
 | 4 | Canvas UX & Sync | Entrega de bloque nativo en canvas con refresco manual/automático | CVS-01, CVS-02, SNC-01, SNC-02, SNC-03 | 5 |
 
@@ -47,10 +47,10 @@ Plans:
 2. Archivo en repo privado se descarga correctamente con PAT válido.
 3. Errores por token inválido/sin permisos se muestran de forma comprensible.
 
-**Plans:** 0/1 plans complete
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] `02-01-PLAN.md` — Flujo de acceso público/privado con PAT por fichero, retry=1 y UX de errores AUTH-01/02/03
+- [x] `02-01-PLAN.md` — Flujo de acceso público/privado con PAT por fichero, retry=1 y UX de errores AUTH-01/02/03
 
 ## Phase 3: Render Engine
 
@@ -94,4 +94,4 @@ Plans:
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-02 after phase 2 planning*
+*Last updated: 2026-03-02 after phase 2 execution*
