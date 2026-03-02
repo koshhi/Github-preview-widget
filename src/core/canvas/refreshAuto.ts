@@ -41,10 +41,6 @@ async function refreshEligibleBlocksOnOpen(blocks, options = {}) {
     throw new TypeError("refreshEligibleBlocksOnOpen requires options.fetchContent function");
   }
 
-  const renderPreview =
-    typeof options.renderPreview === "function"
-      ? options.renderPreview
-      : renderFilePreview;
 
   const updatedBlocks = [];
   const results = [];
@@ -110,7 +106,11 @@ async function refreshEligibleBlocksOnOpen(blocks, options = {}) {
       continue;
     }
 
-    const rendered = renderPreview(toRenderInput(syncingBlock, fetched.value || {}));
+    const renderInput = toRenderInput(syncingBlock, fetched.value || {});
+    const rendered =
+      typeof options.renderPreview === "function"
+        ? options.renderPreview(renderInput)
+        : renderFilePreview(renderInput);
     if (!rendered?.ok) {
       const normalizedError = normalizeError(rendered?.error);
       const failedState = transitionSyncState(
