@@ -68,6 +68,11 @@ Plans:
 3. Bloques Mermaid se transforman en diagramas visibles o fallback controlado si fallan.
 4. Primer render cumple objetivo de <2s bajo límites de tamaño definidos.
 
+**Plans:** 0/1 plans complete
+
+Plans:
+- [ ] `03-01-PLAN.md` — Pipeline de render para código/markdown/mermaid con fallback controlado y objetivo <2s
+
 ## Phase 4: Canvas UX & Sync
 
 **Goal:** Integrar el embed en canvas con apariencia nativa y sincronización usable por equipos.
