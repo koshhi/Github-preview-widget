@@ -13,7 +13,7 @@
 | 5 | Widget Runtime Bootstrap | Complete (2026-03-03) | WDG-01, WDG-02, QLT-04 | 4 |
 | 6 | End-to-End Widget Rendering | Complete (2026-03-03) | WDG-03, INT-04, INT-05 | 4 |
 | 7 | Private Access & PAT Safety | Complete (2026-03-03) | SEC-01, SEC-02, SEC-03 | 4 |
-| 8 | Sync, UAT & Docs | Cerrar refresh in-place, estado sync y guía de uso real | SNC-07, SNC-08, SNC-09, QLT-05 | 5 |
+| 8 | Sync, UAT & Docs | Complete (2026-03-03) | SNC-07, SNC-08, SNC-09, QLT-05 | 5 |
 
 ## Phase 5: Widget Runtime Bootstrap
 
@@ -85,4 +85,4 @@
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-03 after phase 7 execution*
+*Last updated: 2026-03-03 after phase 8 execution*

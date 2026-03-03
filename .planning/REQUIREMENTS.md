@@ -25,14 +25,14 @@
 
 ### Sync in Widget
 
-- [ ] **SNC-07**: Usuario puede refrescar manualmente una instancia existente y ver contenido actualizado in-place.
-- [ ] **SNC-08**: Al reabrir el widget/plugin host, se ejecuta refresh automático para instancias elegibles.
-- [ ] **SNC-09**: La instancia muestra estado legible de sincronización (`idle | syncing | success | error`) y último resultado.
+- [x] **SNC-07**: Usuario puede refrescar manualmente una instancia existente y ver contenido actualizado in-place.
+- [x] **SNC-08**: Al reabrir el widget/plugin host, se ejecuta refresh automático para instancias elegibles.
+- [x] **SNC-09**: La instancia muestra estado legible de sincronización (`idle | syncing | success | error`) y último resultado.
 
 ### Quality & DX
 
 - [x] **QLT-04**: Developer puede ejecutar scripts de build/check del runtime del widget además de `npm test` y `npm run typecheck`.
-- [ ] **QLT-05**: README documenta pasos reales para cargar y probar el widget en Figma de extremo a extremo.
+- [x] **QLT-05**: README documenta pasos reales para cargar y probar el widget en Figma de extremo a extremo.
 
 ## Future Requirements
 
@@ -63,11 +63,11 @@
 | SEC-01 | Phase 7 | Complete |
 | SEC-02 | Phase 7 | Complete |
 | SEC-03 | Phase 7 | Complete |
-| SNC-07 | Phase 8 | Planned |
-| SNC-08 | Phase 8 | Planned |
-| SNC-09 | Phase 8 | Planned |
+| SNC-07 | Phase 8 | Complete |
+| SNC-08 | Phase 8 | Complete |
+| SNC-09 | Phase 8 | Complete |
 | QLT-04 | Phase 5 | Complete |
-| QLT-05 | Phase 8 | Planned |
+| QLT-05 | Phase 8 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 13 total
@@ -76,4 +76,4 @@
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-03 after phase 7 execution*
+*Last updated: 2026-03-03 after phase 8 execution*
