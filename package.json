@@ -1,0 +1,18 @@
+{
+  "name": "github-preview-widget",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node scripts/typecheck.cjs",
+    "widget:build": "node scripts/widget-build.cjs",
+    "widget:check": "node scripts/widget-check.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

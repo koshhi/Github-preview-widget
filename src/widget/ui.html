@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub Preview Widget</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, sans-serif;
+        background: #f7f7f8;
+        color: #1e1e1f;
+      }
+
+      .root {
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .label {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #d4d4d8;
+        background: #fff;
+        font-size: 12px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        background: #111827;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .secondary {
+        background: #e4e4e7;
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <form class="root" id="url-form">
+      <label class="label" for="url-input">GitHub file URL</label>
+      <input id="url-input" placeholder="https://github.com/org/repo/blob/main/README.md" required />
+      <button type="submit">Create preview</button>
+      <button class="secondary" id="refresh-button" type="button">Refresh preview</button>
+    </form>
+
+    <script>
+      const form = document.getElementById("url-form");
+      const input = document.getElementById("url-input");
+      const refreshButton = document.getElementById("refresh-button");
+      let activeWidgetId = "active-widget";
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "create-preview",
+              url: input.value,
+            },
+          },
+          "*"
+        );
+      });
+
+      refreshButton.addEventListener("click", () => {
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "refresh-preview",
+              widgetId: activeWidgetId,
+            },
+          },
+          "*"
+        );
+      });
+
+      window.onmessage = (event) => {
+        const payload = event.data && event.data.pluginMessage;
+        if (!payload || payload.type !== "widget-context") {
+          return;
+        }
+
+        if (typeof payload.lastUrl === "string" && payload.lastUrl.length > 0) {
+          input.value = payload.lastUrl;
+        }
+
+        if (typeof payload.widgetId === "string" && payload.widgetId.length > 0) {
+          activeWidgetId = payload.widgetId;
+        }
+      };
+    </script>
+  </body>
+</html>
