@@ -1821,6 +1821,77 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     }
   });
 
+  // src/widget/runtime/normalizeRenderForWidget.ts
+  var require_normalizeRenderForWidget = __commonJS({
+    "src/widget/runtime/normalizeRenderForWidget.ts"(exports, module) {
+      function asArray(value) {
+        return Array.isArray(value) ? value : [];
+      }
+      function normalizeWarningList(list) {
+        const seen = /* @__PURE__ */ new Set();
+        const normalized = [];
+        for (const item of asArray(list)) {
+          if (typeof item !== "string") {
+            continue;
+          }
+          const next = item.trim();
+          if (!next || seen.has(next)) {
+            continue;
+          }
+          seen.add(next);
+          normalized.push(next);
+        }
+        return normalized;
+      }
+      function normalizeRenderForWidget(preview = {}, options = {}) {
+        var _a, _b;
+        const sourceBlocks = asArray(preview.blocks);
+        const normalizedBlocks = [];
+        const warnings = normalizeWarningList(preview.warnings);
+        for (const block of sourceBlocks) {
+          if ((block == null ? void 0 : block.type) === "mermaid") {
+            normalizedBlocks.push({
+              type: "code",
+              language: "mermaid",
+              content: String(block.content || ""),
+              meta: {
+                fromMermaidDiagram: true,
+                phasePolicy: "code_view_only"
+              }
+            });
+            warnings.push("Mermaid shown as code in phase 6.");
+            continue;
+          }
+          if ((block == null ? void 0 : block.type) === "code" && (block == null ? void 0 : block.language) === "mermaid" && ((_a = block == null ? void 0 : block.meta) == null ? void 0 : _a.fallback)) {
+            warnings.push("Mermaid fallback active: showing code block.");
+            normalizedBlocks.push(block);
+            continue;
+          }
+          normalizedBlocks.push(block);
+        }
+        const dedupedWarnings = normalizeWarningList(warnings);
+        const warningDetail = dedupedWarnings.length > 0 ? `${dedupedWarnings[0]}${dedupedWarnings.length > 1 ? ` (+${dedupedWarnings.length - 1} more)` : ""}` : "";
+        return {
+          preview: {
+            ...preview,
+            blocks: normalizedBlocks,
+            warnings: dedupedWarnings
+          },
+          warnings: dedupedWarnings,
+          warningDetail,
+          policy: {
+            mode: preview.progressive ? "progressive" : "full",
+            firstPreviewMs: ((_b = preview == null ? void 0 : preview.metrics) == null ? void 0 : _b.firstPreviewMs) || null,
+            targetMs: typeof options.targetFirstPreviewMs === "number" ? options.targetFirstPreviewMs : 2e3
+          }
+        };
+      }
+      module.exports = {
+        normalizeRenderForWidget
+      };
+    }
+  });
+
   // src/widget/runtime/createOrRefreshEmbedFromUrl.ts
   var require_createOrRefreshEmbedFromUrl = __commonJS({
     "src/widget/runtime/createOrRefreshEmbedFromUrl.ts"(exports, module) {
@@ -1834,6 +1905,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         buildWidgetSnapshot,
         mergeWidgetSnapshot
       } = require_persistWidgetSnapshot();
+      var {
+        normalizeRenderForWidget
+      } = require_normalizeRenderForWidget();
       function resolveNow(inputNow) {
         if (typeof inputNow === "string" && inputNow) {
           return inputNow;
@@ -2010,10 +2084,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             }
           };
         }
-        const normalizePreview = typeof deps.normalizePreview === "function" ? deps.normalizePreview : (value) => value;
+        const normalizePreview = typeof deps.normalizePreview === "function" ? deps.normalizePreview : normalizeRenderForWidget;
         const normalizedPreview = normalizePreview(renderResult.value, {
           url,
-          source: readResult.value.source
+          source: readResult.value.source,
+          targetFirstPreviewMs: 2e3
         });
         const preview = (normalizedPreview == null ? void 0 : normalizedPreview.preview) || normalizedPreview;
         const warnings = Array.isArray(normalizedPreview == null ? void 0 : normalizedPreview.warnings) ? normalizedPreview.warnings : Array.isArray(preview == null ? void 0 : preview.warnings) ? preview.warnings : [];
