@@ -1,3 +1,6 @@
+const { parseUiCommand } = require("./bridge/parseUiCommand.ts");
+const { UI_COMMAND, UI_EVENT } = require("./bridge/messages.ts");
+
 const { widget } = figma;
 const { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
 
@@ -14,6 +17,7 @@ function GitHubPreviewWidget() {
     "runtime-status",
     "Ready: open URL input"
   );
+  const [lastUrl, setLastUrl] = useSyncedState("last-url", "");
 
   usePropertyMenu(
     [
@@ -26,19 +30,33 @@ function GitHubPreviewWidget() {
     (event) => {
       if (event.propertyName === "open-url") {
         openWidgetUi();
+        figma.ui.postMessage({
+          type: UI_EVENT.WIDGET_CONTEXT,
+          widgetId: "active-widget",
+          lastUrl,
+        });
       }
     }
   );
 
   useEffect(() => {
     figma.ui.onmessage = (message) => {
-      if (!message || typeof message !== "object") {
+      const parsed = parseUiCommand(message);
+      if (!parsed.ok) {
+        setStatus(`Bridge error: ${parsed.error.code}`);
         return;
       }
 
-      if (message.type === "create-preview") {
-        setStatus("URL received. Preview bootstrap enabled.");
+      const command = parsed.value;
+      if (command.type === UI_COMMAND.CREATE_PREVIEW) {
+        setLastUrl(command.url);
+        setStatus("URL received. Seed preview requested.");
         figma.notify("URL received. Runtime bootstrap OK.");
+        return;
+      }
+
+      if (command.type === UI_COMMAND.REFRESH_PREVIEW) {
+        setStatus("Refresh command received (placeholder in phase 5).");
       }
     };
 
@@ -59,7 +77,12 @@ function GitHubPreviewWidget() {
       cornerRadius: 8,
     },
     h(Text, { fontSize: 12, fontWeight: 600 }, "GitHub Preview Widget"),
-    h(Text, { fontSize: 11, fill: "#5C5C5C" }, status)
+    h(Text, { fontSize: 11, fill: "#5C5C5C" }, status),
+    h(
+      Text,
+      { fontSize: 10, fill: "#7A7A7A" },
+      lastUrl ? `Last URL: ${lastUrl}` : "No URL captured yet"
+    )
   );
 }
 
