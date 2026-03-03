@@ -1,5 +1,6 @@
 const { parseUiCommand } = require("./bridge/parseUiCommand.ts");
 const { UI_COMMAND, UI_EVENT } = require("./bridge/messages.ts");
+const { createSeedEmbed } = require("./bootstrap/createSeedEmbed.ts");
 
 const { widget } = figma;
 const { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
@@ -18,6 +19,7 @@ function GitHubPreviewWidget() {
     "Ready: open URL input"
   );
   const [lastUrl, setLastUrl] = useSyncedState("last-url", "");
+  const [embedBlock, setEmbedBlock] = useSyncedState("embed-block", null);
 
   usePropertyMenu(
     [
@@ -50,8 +52,16 @@ function GitHubPreviewWidget() {
       const command = parsed.value;
       if (command.type === UI_COMMAND.CREATE_PREVIEW) {
         setLastUrl(command.url);
-        setStatus("URL received. Seed preview requested.");
-        figma.notify("URL received. Runtime bootstrap OK.");
+        const seed = createSeedEmbed({ url: command.url });
+        if (!seed.ok) {
+          setStatus(`Seed failed: ${seed.error.code}`);
+          figma.notify(seed.error.message, { error: true });
+          return;
+        }
+
+        setEmbedBlock(seed.value.embedBlock);
+        setStatus(`Seed ready: ${seed.value.source.sourceKey}`);
+        figma.notify("Seed preview created.");
         return;
       }
 
@@ -82,6 +92,13 @@ function GitHubPreviewWidget() {
       Text,
       { fontSize: 10, fill: "#7A7A7A" },
       lastUrl ? `Last URL: ${lastUrl}` : "No URL captured yet"
+    ),
+    h(
+      Text,
+      { fontSize: 10, fill: "#7A7A7A" },
+      embedBlock
+        ? `Embed: ${embedBlock.sections.header.ownerRepo} · ${embedBlock.sections.header.path}`
+        : "Embed: pending"
     )
   );
 }
