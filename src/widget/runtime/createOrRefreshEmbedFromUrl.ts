@@ -59,6 +59,26 @@ function normalizeError(errorLike, fallbackCode, fallbackMessage, fallbackDetail
   };
 }
 
+function normalizeAuthState(authLike) {
+  if (!authLike || typeof authLike !== "object") {
+    return null;
+  }
+
+  return {
+    kind: typeof authLike.kind === "string" ? authLike.kind : null,
+    sourceKey:
+      typeof authLike.sourceKey === "string" && authLike.sourceKey
+        ? authLike.sourceKey
+        : null,
+    usedPat: Boolean(authLike.usedPat),
+    retryCount: Number(authLike.retryCount || 0),
+    patStatus:
+      typeof authLike.patStatus === "string" && authLike.patStatus
+        ? authLike.patStatus
+        : null,
+  };
+}
+
 async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
   const url = typeof input.url === "string" ? input.url.trim() : "";
   if (!url) {
@@ -163,6 +183,7 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
     return {
       ok: false,
       error,
+      auth: normalizeAuthState(readResult?.auth),
       value: {
         embedBlock: failedBlock,
         snapshot,
@@ -287,6 +308,7 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
 
   return {
     ok: true,
+    auth: normalizeAuthState(readResult?.auth),
     value: {
       embedBlock: updatedBlock,
       snapshot,

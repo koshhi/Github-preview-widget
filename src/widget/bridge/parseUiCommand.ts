@@ -54,6 +54,51 @@ function parseUiCommand(payload) {
     };
   }
 
+  if (payload.type === UI_COMMAND.SUBMIT_PAT) {
+    if (
+      typeof payload.sourceKey !== "string" ||
+      payload.sourceKey.trim().length === 0
+    ) {
+      return fail(
+        "INVALID_SOURCE_KEY",
+        "submit-pat requires a non-empty sourceKey."
+      );
+    }
+
+    if (typeof payload.token !== "string" || payload.token.trim().length === 0) {
+      return fail("INVALID_PAT", "submit-pat requires a non-empty token.");
+    }
+
+    return {
+      ok: true,
+      value: {
+        type: UI_COMMAND.SUBMIT_PAT,
+        sourceKey: payload.sourceKey.trim(),
+        token: payload.token.trim(),
+      },
+    };
+  }
+
+  if (payload.type === UI_COMMAND.FORGET_PAT) {
+    if (
+      typeof payload.sourceKey !== "string" ||
+      payload.sourceKey.trim().length === 0
+    ) {
+      return fail(
+        "INVALID_SOURCE_KEY",
+        "forget-pat requires a non-empty sourceKey."
+      );
+    }
+
+    return {
+      ok: true,
+      value: {
+        type: UI_COMMAND.FORGET_PAT,
+        sourceKey: payload.sourceKey.trim(),
+      },
+    };
+  }
+
   return fail("UNSUPPORTED_COMMAND", `Unsupported command type: ${payload.type}`);
 }
 

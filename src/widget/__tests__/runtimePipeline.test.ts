@@ -97,11 +97,20 @@ test("keeps previous content when read fails and marks sync error", async () => 
           message: "Private file requires token",
           details: "No PAT for sourceKey",
         },
+        auth: {
+          kind: "missing_pat",
+          sourceKey: "octocat/hello-world@main:docs/README.md",
+          usedPat: false,
+          retryCount: 0,
+          patStatus: "missing",
+        },
       }),
     }
   );
 
   assert.equal(result.ok, false);
+  assert.equal(result.auth.kind, "missing_pat");
+  assert.equal(result.auth.sourceKey, "octocat/hello-world@main:docs/README.md");
   assert.equal(result.value.embedBlock.sync.status, "error");
   assert.equal(JSON.stringify(result.value.embedBlock.preview.blocks), previousBlocks);
   assert.match(result.value.embedBlock.sync.details, /PAT|sourceKey/i);
