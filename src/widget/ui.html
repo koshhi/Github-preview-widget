@@ -48,6 +48,25 @@
         background: #e4e4e7;
         color: #111827;
       }
+
+      .status {
+        font-size: 11px;
+        color: #0f172a;
+      }
+
+      .status.error {
+        color: #b91c1c;
+      }
+
+      .status.loading {
+        color: #0c4a6e;
+      }
+
+      .details {
+        font-size: 10px;
+        color: #7c2d12;
+        word-break: break-word;
+      }
     </style>
   </head>
   <body>
@@ -56,16 +75,32 @@
       <input id="url-input" placeholder="https://github.com/org/repo/blob/main/README.md" required />
       <button type="submit">Create preview</button>
       <button class="secondary" id="refresh-button" type="button">Refresh preview</button>
+      <div class="status" id="status-line">Ready</div>
+      <div class="details" id="details-line"></div>
     </form>
 
     <script>
       const form = document.getElementById("url-form");
       const input = document.getElementById("url-input");
+      const submitButton = form.querySelector("button[type='submit']");
       const refreshButton = document.getElementById("refresh-button");
+      const statusLine = document.getElementById("status-line");
+      const detailsLine = document.getElementById("details-line");
       let activeWidgetId = "active-widget";
+
+      function setStatus(level, message, details = "") {
+        statusLine.textContent = message || "Ready";
+        statusLine.className = `status ${level || ""}`.trim();
+        detailsLine.textContent = details || "";
+
+        const isLoading = level === "loading";
+        submitButton.disabled = isLoading;
+        refreshButton.disabled = isLoading;
+      }
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
+        setStatus("loading", "Syncing...");
 
         parent.postMessage(
           {
@@ -79,6 +114,7 @@
       });
 
       refreshButton.addEventListener("click", () => {
+        setStatus("loading", "Syncing...");
         parent.postMessage(
           {
             pluginMessage: {
@@ -92,16 +128,27 @@
 
       window.onmessage = (event) => {
         const payload = event.data && event.data.pluginMessage;
-        if (!payload || payload.type !== "widget-context") {
+        if (!payload || typeof payload.type !== "string") {
           return;
         }
 
-        if (typeof payload.lastUrl === "string" && payload.lastUrl.length > 0) {
-          input.value = payload.lastUrl;
+        if (payload.type === "widget-context") {
+          if (typeof payload.lastUrl === "string" && payload.lastUrl.length > 0) {
+            input.value = payload.lastUrl;
+          }
+
+          if (typeof payload.widgetId === "string" && payload.widgetId.length > 0) {
+            activeWidgetId = payload.widgetId;
+          }
+
+          if (typeof payload.status === "string" && payload.status.length > 0) {
+            setStatus("", payload.status);
+          }
+          return;
         }
 
-        if (typeof payload.widgetId === "string" && payload.widgetId.length > 0) {
-          activeWidgetId = payload.widgetId;
+        if (payload.type === "runtime-status") {
+          setStatus(payload.level, payload.message, payload.details);
         }
       };
     </script>
