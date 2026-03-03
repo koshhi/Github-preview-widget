@@ -1,4 +1,4 @@
-const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .danger {\n        background: #fee2e2;\n        color: #991b1b;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n      }\n\n      .actions {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 8px;\n      }\n\n      .auth-panel {\n        display: none;\n        border: 1px solid #fca5a5;\n        border-radius: 8px;\n        background: #fff1f2;\n        padding: 10px;\n        gap: 8px;\n      }\n\n      .auth-panel[data-open=\"true\"] {\n        display: grid;\n      }\n\n      .auth-title {\n        font-size: 11px;\n        font-weight: 700;\n        color: #9f1239;\n      }\n\n      .auth-copy {\n        font-size: 11px;\n        color: #7f1d1d;\n      }\n\n      .auth-meta {\n        font-size: 10px;\n        color: #9a3412;\n        word-break: break-word;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <div class=\"actions\">\n        <button type=\"submit\">Create preview</button>\n        <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      </div>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"details\" id=\"details-line\"></div>\n      <div class=\"auth-panel\" id=\"auth-panel\" data-open=\"false\">\n        <div class=\"auth-title\">Private file requires PAT</div>\n        <div class=\"auth-copy\" id=\"auth-copy\"></div>\n        <div class=\"auth-meta\" id=\"auth-meta\"></div>\n        <label class=\"label\" for=\"pat-input\">Personal access token</label>\n        <input id=\"pat-input\" type=\"password\" placeholder=\"ghp_xxx or github_pat_xxx\" />\n        <div class=\"actions\">\n          <button class=\"secondary\" id=\"save-pat-button\" type=\"button\">Guardar PAT y reintentar</button>\n          <button class=\"danger\" id=\"forget-pat-button\" type=\"button\">Olvidar PAT fichero</button>\n        </div>\n      </div>\n    </form>\n\n    <script>\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const patInput = document.getElementById(\"pat-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const savePatButton = document.getElementById(\"save-pat-button\");\n      const forgetPatButton = document.getElementById(\"forget-pat-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const detailsLine = document.getElementById(\"details-line\");\n      const authPanel = document.getElementById(\"auth-panel\");\n      const authCopy = document.getElementById(\"auth-copy\");\n      const authMeta = document.getElementById(\"auth-meta\");\n      let activeWidgetId = \"active-widget\";\n      let activeAuthContext = null;\n\n      const AUTH_MESSAGES = {\n        MISSING_PAT:\n          \"El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.\",\n        EXPIRED_PAT: \"Tu personal access token es invalido o ha expirado.\",\n        CURRENT_PAT: \"Tu personal access token no tiene permisos/scope suficiente.\",\n      };\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      function setAuthPanel(open, payload = null) {\n        if (!open || !payload || typeof payload.sourceKey !== \"string\") {\n          activeAuthContext = null;\n          authPanel.dataset.open = \"false\";\n          authCopy.textContent = \"\";\n          authMeta.textContent = \"\";\n          patInput.value = \"\";\n          savePatButton.disabled = false;\n          forgetPatButton.disabled = false;\n          return;\n        }\n\n        activeAuthContext = payload;\n        authPanel.dataset.open = \"true\";\n        authCopy.textContent =\n          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;\n        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      savePatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para guardar PAT.\");\n          return;\n        }\n\n        const token = patInput.value.trim();\n        if (!token) {\n          setStatus(\"error\", \"Introduce un PAT valido para continuar.\");\n          return;\n        }\n\n        setStatus(\"loading\", \"Reintentando con PAT...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"submit-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n              token,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      forgetPatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para olvidar PAT.\");\n          return;\n        }\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"forget-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n\n          if (payload.authContext && typeof payload.authContext === \"object\") {\n            setAuthPanel(true, payload.authContext);\n          } else {\n            setAuthPanel(false);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n          if (payload.authRequired && typeof payload.sourceKey === \"string\") {\n            setAuthPanel(true, payload);\n          } else if (payload.level === \"success\") {\n            setAuthPanel(false);\n          }\n        }\n      };\n    </script>\n  </body>\n</html>\n";
+const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .danger {\n        background: #fee2e2;\n        color: #991b1b;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .status.success {\n        color: #166534;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n        display: none;\n      }\n\n      .details[data-open=\"true\"] {\n        display: block;\n      }\n\n      .actions {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 8px;\n      }\n\n      .auth-panel {\n        display: none;\n        border: 1px solid #fca5a5;\n        border-radius: 8px;\n        background: #fff1f2;\n        padding: 10px;\n        gap: 8px;\n      }\n\n      .auth-panel[data-open=\"true\"] {\n        display: grid;\n      }\n\n      .auth-title {\n        font-size: 11px;\n        font-weight: 700;\n        color: #9f1239;\n      }\n\n      .auth-copy {\n        font-size: 11px;\n        color: #7f1d1d;\n      }\n\n      .auth-meta {\n        font-size: 10px;\n        color: #9a3412;\n        word-break: break-word;\n      }\n\n      .link-button {\n        border: 0;\n        background: transparent;\n        padding: 0;\n        font-size: 11px;\n        text-decoration: underline;\n        color: #0f172a;\n        cursor: pointer;\n        text-align: left;\n      }\n\n      .result-meta {\n        font-size: 10px;\n        color: #475569;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <div class=\"actions\">\n        <button type=\"submit\">Create preview</button>\n        <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      </div>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"result-meta\" id=\"result-line\">State: idle</div>\n      <button class=\"link-button\" id=\"toggle-details-button\" type=\"button\">Show details</button>\n      <div class=\"details\" id=\"details-line\" data-open=\"false\"></div>\n      <div class=\"auth-panel\" id=\"auth-panel\" data-open=\"false\">\n        <div class=\"auth-title\">Private file requires PAT</div>\n        <div class=\"auth-copy\" id=\"auth-copy\"></div>\n        <div class=\"auth-meta\" id=\"auth-meta\"></div>\n        <label class=\"label\" for=\"pat-input\">Personal access token</label>\n        <input id=\"pat-input\" type=\"password\" placeholder=\"ghp_xxx or github_pat_xxx\" />\n        <div class=\"actions\">\n          <button class=\"secondary\" id=\"save-pat-button\" type=\"button\">Guardar PAT y reintentar</button>\n          <button class=\"danger\" id=\"forget-pat-button\" type=\"button\">Olvidar PAT fichero</button>\n        </div>\n      </div>\n    </form>\n\n    <script>\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const patInput = document.getElementById(\"pat-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const savePatButton = document.getElementById(\"save-pat-button\");\n      const forgetPatButton = document.getElementById(\"forget-pat-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const resultLine = document.getElementById(\"result-line\");\n      const toggleDetailsButton = document.getElementById(\"toggle-details-button\");\n      const detailsLine = document.getElementById(\"details-line\");\n      const authPanel = document.getElementById(\"auth-panel\");\n      const authCopy = document.getElementById(\"auth-copy\");\n      const authMeta = document.getElementById(\"auth-meta\");\n      let activeWidgetId = \"active-widget\";\n      let activeAuthContext = null;\n      let detailsOpen = false;\n\n      const AUTH_MESSAGES = {\n        MISSING_PAT:\n          \"El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.\",\n        EXPIRED_PAT: \"Tu personal access token es invalido o ha expirado.\",\n        CURRENT_PAT: \"Tu personal access token no tiene permisos/scope suficiente.\",\n      };\n\n      function updateDetailsVisibility() {\n        detailsLine.dataset.open = detailsOpen ? \"true\" : \"false\";\n        toggleDetailsButton.textContent = detailsOpen ? \"Hide details\" : \"Show details\";\n      }\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n        if (!details) {\n          detailsOpen = false;\n        }\n        updateDetailsVisibility();\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      function setLastResult(lastResult, syncState) {\n        const safe = lastResult && typeof lastResult === \"object\" ? lastResult : {};\n        const status = safe.status || syncState || \"idle\";\n        const mode = safe.mode || \"manual\";\n        const message = safe.message ? ` · ${safe.message}` : \"\";\n        resultLine.textContent = `State: ${status} (${mode})${message}`;\n      }\n\n      function setAuthPanel(open, payload = null) {\n        if (!open || !payload || typeof payload.sourceKey !== \"string\") {\n          activeAuthContext = null;\n          authPanel.dataset.open = \"false\";\n          authCopy.textContent = \"\";\n          authMeta.textContent = \"\";\n          patInput.value = \"\";\n          savePatButton.disabled = false;\n          forgetPatButton.disabled = false;\n          return;\n        }\n\n        activeAuthContext = payload;\n        authPanel.dataset.open = \"true\";\n        authCopy.textContent =\n          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;\n        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      toggleDetailsButton.addEventListener(\"click\", () => {\n        detailsOpen = !detailsOpen;\n        updateDetailsVisibility();\n      });\n\n      savePatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para guardar PAT.\");\n          return;\n        }\n\n        const token = patInput.value.trim();\n        if (!token) {\n          setStatus(\"error\", \"Introduce un PAT valido para continuar.\");\n          return;\n        }\n\n        setStatus(\"loading\", \"Reintentando con PAT...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"submit-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n              token,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      forgetPatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para olvidar PAT.\");\n          return;\n        }\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"forget-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n          setLastResult(payload.lastResult, payload.syncState);\n\n          if (payload.authContext && typeof payload.authContext === \"object\") {\n            setAuthPanel(true, payload.authContext);\n          } else {\n            setAuthPanel(false);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n          setLastResult(payload.lastResult, payload.syncState);\n          if (payload.authRequired && typeof payload.sourceKey === \"string\") {\n            setAuthPanel(true, payload);\n          } else if (payload.level === \"success\") {\n            setAuthPanel(false);\n          }\n        }\n      };\n\n      updateDetailsVisibility();\n    </script>\n  </body>\n</html>\n";
 (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __commonJS = (cb, mod) => function __require() {
@@ -464,7 +464,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         SUCCESS: "success",
         ERROR: "error"
       });
-      var SYNC_MODE = Object.freeze({
+      var SYNC_MODE2 = Object.freeze({
         MANUAL: "manual",
         AUTO: "auto"
       });
@@ -488,7 +488,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       module.exports = {
         EMBED_BLOCK_KIND,
         SYNC_STATUS,
-        SYNC_MODE,
+        SYNC_MODE: SYNC_MODE2,
         SYNC_BADGE_TONE,
         REFRESH_TRIGGER,
         BLOCK_LIMITS
@@ -503,7 +503,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         EMBED_BLOCK_KIND,
         BLOCK_LIMITS,
         SYNC_STATUS,
-        SYNC_MODE
+        SYNC_MODE: SYNC_MODE2
       } = require_types2();
       function sanitizeText(value, fallback) {
         if (typeof value === "string" && value.trim()) {
@@ -554,7 +554,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       function createInitialSyncState(sync, nowIso) {
         return {
           status: typeof (sync == null ? void 0 : sync.status) === "string" ? sync.status : SYNC_STATUS.IDLE,
-          mode: typeof (sync == null ? void 0 : sync.mode) === "string" ? sync.mode : SYNC_MODE.MANUAL,
+          mode: typeof (sync == null ? void 0 : sync.mode) === "string" ? sync.mode : SYNC_MODE2.MANUAL,
           lastSyncAt: typeof (sync == null ? void 0 : sync.lastSyncAt) === "string" && sync.lastSyncAt ? sync.lastSyncAt : null,
           message: typeof (sync == null ? void 0 : sync.message) === "string" && sync.message ? sync.message : "Sin sincronizar",
           details: typeof (sync == null ? void 0 : sync.details) === "string" ? sync.details : "",
@@ -668,7 +668,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
   // src/widget/bootstrap/widgetMetadata.ts
   var require_widgetMetadata = __commonJS({
     "src/widget/bootstrap/widgetMetadata.ts"(exports, module) {
-      var { SYNC_MODE, SYNC_STATUS } = require_types2();
+      var { SYNC_MODE: SYNC_MODE2, SYNC_STATUS } = require_types2();
       function parseSourceKey(sourceKey) {
         const match = String(sourceKey || "").match(/^([^/]+)\/([^@]+)@([^:]+):(.+)$/);
         if (!match) {
@@ -689,7 +689,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           source: parsed,
           lastSync: null,
           syncState: SYNC_STATUS.IDLE,
-          syncMode: SYNC_MODE.MANUAL,
+          syncMode: SYNC_MODE2.MANUAL,
           createdAt: now,
           updatedAt: now
         };
@@ -706,7 +706,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     "src/widget/bootstrap/createSeedEmbed.ts"(exports, module) {
       var { ingestGithubFileUrl } = require_ingestGithubFileUrl();
       var { composeEmbedBlock } = require_composeEmbedBlock();
-      var { SYNC_MODE, SYNC_STATUS } = require_types2();
+      var { SYNC_MODE: SYNC_MODE2, SYNC_STATUS } = require_types2();
       var { createSeedMetadata } = require_widgetMetadata();
       function createSeedEmbed(input = {}) {
         const url = typeof input.url === "string" ? input.url.trim() : "";
@@ -756,7 +756,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           },
           sync: {
             status: SYNC_STATUS.IDLE,
-            mode: SYNC_MODE.MANUAL,
+            mode: SYNC_MODE2.MANUAL,
             message: "Seed preview ready",
             details: "",
             lastSyncAt: null
@@ -1730,10 +1730,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
   // src/core/canvas/syncState.ts
   var require_syncState = __commonJS({
     "src/core/canvas/syncState.ts"(exports, module) {
-      var { SYNC_STATUS, SYNC_MODE, SYNC_BADGE_TONE } = require_types2();
+      var { SYNC_STATUS, SYNC_MODE: SYNC_MODE2, SYNC_BADGE_TONE } = require_types2();
       function normalizeMode(mode) {
-        if (mode === SYNC_MODE.AUTO) return SYNC_MODE.AUTO;
-        return SYNC_MODE.MANUAL;
+        if (mode === SYNC_MODE2.AUTO) return SYNC_MODE2.AUTO;
+        return SYNC_MODE2.MANUAL;
       }
       function resolveNow(options = {}) {
         if (typeof options.now === "string" && options.now) {
@@ -1761,7 +1761,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             status: SYNC_STATUS.SUCCESS,
             mode,
             lastSyncAt: syncedAt,
-            message: typeof event.message === "string" && event.message ? event.message : mode === SYNC_MODE.AUTO ? "Auto-sync completado" : "Sincronizaci\xF3n completada",
+            message: typeof event.message === "string" && event.message ? event.message : mode === SYNC_MODE2.AUTO ? "Auto-sync completado" : "Sincronizaci\xF3n completada",
             details: "",
             lastUpdatedAt: nowIso
           };
@@ -1792,7 +1792,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         if (status === SYNC_STATUS.SYNCING) {
           label = "Syncing...";
         } else if (status === SYNC_STATUS.SUCCESS) {
-          label = mode === SYNC_MODE.AUTO ? "Auto-sync" : "Synced";
+          label = mode === SYNC_MODE2.AUTO ? "Auto-sync" : "Synced";
         } else if (status === SYNC_STATUS.ERROR) {
           label = "Sync error";
         }
@@ -1866,15 +1866,28 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           progressive: Boolean(preview.progressive)
         };
       }
+      function buildLastResultSnapshot(input = {}) {
+        const base = input.lastResult && typeof input.lastResult === "object" ? input.lastResult : {};
+        const status = typeof base.status === "string" && base.status ? base.status : typeof input.syncState === "string" && input.syncState ? input.syncState : "idle";
+        return {
+          status,
+          mode: typeof base.mode === "string" && base.mode ? base.mode : "manual",
+          message: typeof base.message === "string" ? base.message : "",
+          details: typeof base.details === "string" ? base.details : "",
+          at: typeof base.at === "string" && base.at ? base.at : typeof input.updatedAt === "string" && input.updatedAt ? input.updatedAt : (/* @__PURE__ */ new Date()).toISOString()
+        };
+      }
       function buildWidgetSnapshot(input = {}) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
         const block = input.embedBlock || {};
         const warnings = Array.isArray(input.warnings) ? input.warnings.filter((warning) => typeof warning === "string" && warning.trim()) : [];
+        const syncState = ((_a = block.sync) == null ? void 0 : _a.status) || "idle";
+        const updatedAt = typeof input.updatedAt === "string" && input.updatedAt ? input.updatedAt : (/* @__PURE__ */ new Date()).toISOString();
         return {
           version: 1,
           sourceKey: typeof block.sourceKey === "string" && block.sourceKey ? block.sourceKey : String(input.sourceKey || ""),
           sourceUrl: typeof input.sourceUrl === "string" ? input.sourceUrl : "",
-          syncState: ((_a = block.sync) == null ? void 0 : _a.status) || "idle",
+          syncState,
           lastSync: ((_b = block.sync) == null ? void 0 : _b.lastSyncAt) || null,
           warnings,
           warningCount: warnings.length,
@@ -1883,12 +1896,24 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             firstPreviewMs: typeof ((_c = input.metrics) == null ? void 0 : _c.firstPreviewMs) === "number" ? input.metrics.firstPreviewMs : null,
             cacheHit: Boolean((_d = input.metrics) == null ? void 0 : _d.cacheHit)
           },
-          updatedAt: typeof input.updatedAt === "string" && input.updatedAt ? input.updatedAt : (/* @__PURE__ */ new Date()).toISOString()
+          lastResult: buildLastResultSnapshot({
+            lastResult: input.lastResult || {
+              status: ((_e = block.sync) == null ? void 0 : _e.status) || "idle",
+              mode: ((_f = block.sync) == null ? void 0 : _f.mode) || "manual",
+              message: ((_g = block.sync) == null ? void 0 : _g.message) || "",
+              details: ((_h = block.sync) == null ? void 0 : _h.details) || "",
+              at: ((_i = block.sync) == null ? void 0 : _i.lastUpdatedAt) || updatedAt
+            },
+            syncState,
+            updatedAt
+          }),
+          updatedAt
         };
       }
       function mergeWidgetSnapshot(previousSnapshot, patch = {}) {
         const previous = previousSnapshot && typeof previousSnapshot === "object" ? previousSnapshot : {};
         const hasField = (name) => Object.prototype.hasOwnProperty.call(patch, name);
+        const updatedAt = typeof patch.updatedAt === "string" && patch.updatedAt ? patch.updatedAt : (/* @__PURE__ */ new Date()).toISOString();
         return {
           version: 1,
           sourceKey: typeof patch.sourceKey === "string" && patch.sourceKey ? patch.sourceKey : previous.sourceKey || "",
@@ -1905,7 +1930,15 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             ...previous.metrics || {},
             ...patch.metrics || {}
           },
-          updatedAt: typeof patch.updatedAt === "string" && patch.updatedAt ? patch.updatedAt : (/* @__PURE__ */ new Date()).toISOString()
+          lastResult: buildLastResultSnapshot({
+            lastResult: {
+              ...previous.lastResult || {},
+              ...patch.lastResult || {}
+            },
+            syncState: typeof patch.syncState === "string" && patch.syncState ? patch.syncState : previous.syncState || "idle",
+            updatedAt
+          }),
+          updatedAt
         };
       }
       module.exports = {
@@ -1994,7 +2027,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       var { renderFilePreview } = require_renderFilePreview();
       var { updateEmbedBlockInPlace } = require_updateEmbedBlock();
       var { transitionSyncState } = require_syncState();
-      var { SYNC_MODE } = require_types2();
+      var { SYNC_MODE: SYNC_MODE2 } = require_types2();
       var { redactSensitive: redactSensitive2 } = require_redactSensitive();
       var {
         buildWidgetSnapshot,
@@ -2055,7 +2088,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         };
       }
       async function createOrRefreshEmbedFromUrl2(input = {}, deps = {}) {
-        var _a, _b;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
         const url = typeof input.url === "string" ? input.url.trim() : "";
         if (!url) {
           return {
@@ -2072,6 +2105,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         }
         const now = resolveNow(input.now);
         const nowOptions = { now };
+        const mode = input.mode === SYNC_MODE2.AUTO ? SYNC_MODE2.AUTO : SYNC_MODE2.MANUAL;
         const previousSnapshot = input.currentSnapshot || null;
         const baseBlockResult = input.currentEmbedBlock ? { ok: true, value: input.currentEmbedBlock } : buildSeedBlock(url);
         if (!baseBlockResult.ok) {
@@ -2089,7 +2123,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           baseBlock.sync,
           {
             type: "start",
-            mode: SYNC_MODE.MANUAL
+            mode
           },
           nowOptions
         );
@@ -2116,7 +2150,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             syncingBlock.sync,
             {
               type: "error",
-              mode: SYNC_MODE.MANUAL,
+              mode,
               message: error.message,
               details: error.details
             },
@@ -2135,6 +2169,12 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
               embedBlock: failedBlock,
               sourceUrl: url,
               warnings: ((_a = failedBlock.preview) == null ? void 0 : _a.warnings) || [],
+              lastResult: {
+                status: ((_b = failedBlock.sync) == null ? void 0 : _b.status) || "error",
+                mode: ((_c = failedBlock.sync) == null ? void 0 : _c.mode) || mode,
+                message: ((_d = failedBlock.sync) == null ? void 0 : _d.message) || error.message,
+                details: ((_e = failedBlock.sync) == null ? void 0 : _e.details) || error.details
+              },
               updatedAt: now
             })
           );
@@ -2161,7 +2201,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             syncingBlock.sync,
             {
               type: "error",
-              mode: SYNC_MODE.MANUAL,
+              mode,
               message: error.message,
               details: error.details
             },
@@ -2179,7 +2219,13 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             buildWidgetSnapshot({
               embedBlock: failedBlock,
               sourceUrl: url,
-              warnings: ((_b = failedBlock.preview) == null ? void 0 : _b.warnings) || [],
+              warnings: ((_f = failedBlock.preview) == null ? void 0 : _f.warnings) || [],
+              lastResult: {
+                status: ((_g = failedBlock.sync) == null ? void 0 : _g.status) || "error",
+                mode: ((_h = failedBlock.sync) == null ? void 0 : _h.mode) || mode,
+                message: ((_i = failedBlock.sync) == null ? void 0 : _i.message) || error.message,
+                details: ((_j = failedBlock.sync) == null ? void 0 : _j.details) || error.details
+              },
               updatedAt: now
             })
           );
@@ -2205,8 +2251,8 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           syncingBlock.sync,
           {
             type: "success",
-            mode: SYNC_MODE.MANUAL,
-            message: warnings.length > 0 ? "Preview updated with warnings" : "Preview created",
+            mode,
+            message: warnings.length > 0 ? mode === SYNC_MODE2.AUTO ? "Auto-sync completado con advertencias" : "Preview updated with warnings" : mode === SYNC_MODE2.AUTO ? "Auto-sync completado" : "Preview created",
             details: warningDetail,
             syncedAt: now
           },
@@ -2232,6 +2278,12 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             sourceUrl: url,
             warnings,
             metrics: (preview == null ? void 0 : preview.metrics) || null,
+            lastResult: {
+              status: ((_k = updatedBlock.sync) == null ? void 0 : _k.status) || "success",
+              mode: ((_l = updatedBlock.sync) == null ? void 0 : _l.mode) || mode,
+              message: ((_m = updatedBlock.sync) == null ? void 0 : _m.message) || "Preview created",
+              details: ((_n = updatedBlock.sync) == null ? void 0 : _n.details) || ""
+            },
             updatedAt: now
           })
         );
@@ -2441,6 +2493,91 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     }
   });
 
+  // src/widget/runtime/syncCoordinator.ts
+  var require_syncCoordinator = __commonJS({
+    "src/widget/runtime/syncCoordinator.ts"(exports, module) {
+      var { SYNC_STATUS } = require_types2();
+      var DEFAULT_AUTO_REFRESH_COOLDOWN_MS = 6e4;
+      function normalizeSourceKey(sourceKey) {
+        if (typeof sourceKey !== "string") return "";
+        return sourceKey.trim();
+      }
+      function resolveNowMs(nowMs) {
+        if (typeof nowMs === "number" && Number.isFinite(nowMs) && nowMs >= 0) {
+          return nowMs;
+        }
+        return Date.now();
+      }
+      function shouldRunAutoRefresh2(input = {}, options = {}) {
+        const sourceKey = normalizeSourceKey(input.sourceKey);
+        if (!sourceKey) {
+          return { ok: false, reason: "missing_source_key" };
+        }
+        const sourceUrl = typeof input.sourceUrl === "string" ? input.sourceUrl.trim() : "";
+        if (!sourceUrl) {
+          return { ok: false, reason: "missing_source_url" };
+        }
+        if (input.syncStatus === SYNC_STATUS.SYNCING) {
+          return { ok: false, reason: "already_syncing" };
+        }
+        const nowMs = resolveNowMs(input.nowMs);
+        const cooldownMs = typeof options.cooldownMs === "number" && options.cooldownMs >= 0 ? options.cooldownMs : DEFAULT_AUTO_REFRESH_COOLDOWN_MS;
+        const lastAutoRefreshAt = typeof input.lastAutoRefreshAtMs === "number" && input.lastAutoRefreshAtMs >= 0 ? input.lastAutoRefreshAtMs : null;
+        if (lastAutoRefreshAt !== null && nowMs - lastAutoRefreshAt < cooldownMs) {
+          return {
+            ok: false,
+            reason: "cooldown",
+            nextEligibleAtMs: lastAutoRefreshAt + cooldownMs
+          };
+        }
+        return {
+          ok: true,
+          reason: "eligible",
+          sourceKey,
+          nowMs
+        };
+      }
+      function createSyncCoordinator2(options = {}) {
+        const cooldownMs = typeof options.cooldownMs === "number" && options.cooldownMs >= 0 ? options.cooldownMs : DEFAULT_AUTO_REFRESH_COOLDOWN_MS;
+        const activeManualLocks = /* @__PURE__ */ new Set();
+        function beginManual(input = {}) {
+          const sourceKey = normalizeSourceKey(input.sourceKey);
+          if (!sourceKey) {
+            return { ok: false, reason: "missing_source_key" };
+          }
+          if (input.syncStatus === SYNC_STATUS.SYNCING) {
+            return { ok: false, reason: "already_syncing" };
+          }
+          if (activeManualLocks.has(sourceKey)) {
+            return { ok: false, reason: "manual_lock" };
+          }
+          activeManualLocks.add(sourceKey);
+          return { ok: true, sourceKey };
+        }
+        function endManual(sourceKey) {
+          const normalized = normalizeSourceKey(sourceKey);
+          if (!normalized) return false;
+          return activeManualLocks.delete(normalized);
+        }
+        function canAutoRefresh(input = {}) {
+          return shouldRunAutoRefresh2(input, { cooldownMs });
+        }
+        return {
+          cooldownMs,
+          beginManual,
+          endManual,
+          canAutoRefresh,
+          shouldRunAutoRefresh: canAutoRefresh
+        };
+      }
+      module.exports = {
+        DEFAULT_AUTO_REFRESH_COOLDOWN_MS,
+        createSyncCoordinator: createSyncCoordinator2,
+        shouldRunAutoRefresh: shouldRunAutoRefresh2
+      };
+    }
+  });
+
   // src/widget/code.ts
   var { parseUiCommand } = require_parseUiCommand();
   var { UI_COMMAND, UI_EVENT } = require_messages();
@@ -2452,6 +2589,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     loadPatSessionStore
   } = require_patSessionStore();
   var { redactSensitive } = require_redactSensitive();
+  var {
+    createSyncCoordinator,
+    shouldRunAutoRefresh
+  } = require_syncCoordinator();
+  var { SYNC_MODE } = require_types2();
   var { widget } = figma;
   var { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
   var AUTH_ERROR_CODES = Object.freeze({
@@ -2464,7 +2606,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     [AUTH_ERROR_CODES.EXPIRED_PAT]: "Tu personal access token es invalido o ha expirado.",
     [AUTH_ERROR_CODES.CURRENT_PAT]: "Tu personal access token no tiene permisos/scope suficiente."
   });
+  var syncCoordinator = createSyncCoordinator({ cooldownMs: 6e4 });
   var runtimePatStorePromise = null;
+  var autoRefreshBootstrapped = false;
   function getRuntimePatStore() {
     if (!runtimePatStorePromise) {
       runtimePatStorePromise = loadPatSessionStore({
@@ -2477,9 +2621,44 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
   function openWidgetUi() {
     figma.showUI(__html__, {
       width: 420,
-      height: 360,
+      height: 420,
       title: "GitHub Preview Widget"
     });
+  }
+  function deriveSourceKey(url, embedBlock, embedSnapshot, authContext) {
+    if (typeof (embedBlock == null ? void 0 : embedBlock.sourceKey) === "string" && embedBlock.sourceKey) {
+      return embedBlock.sourceKey;
+    }
+    if (typeof (embedSnapshot == null ? void 0 : embedSnapshot.sourceKey) === "string" && embedSnapshot.sourceKey) {
+      return embedSnapshot.sourceKey;
+    }
+    if (typeof (authContext == null ? void 0 : authContext.sourceKey) === "string" && authContext.sourceKey) {
+      return authContext.sourceKey;
+    }
+    if (typeof url === "string") {
+      return url.trim();
+    }
+    return "";
+  }
+  function buildLastResult(snapshot, embedBlock) {
+    const snapshotLast = snapshot == null ? void 0 : snapshot.lastResult;
+    if (snapshotLast && typeof snapshotLast === "object") {
+      return {
+        status: snapshotLast.status || "idle",
+        mode: snapshotLast.mode || "manual",
+        message: snapshotLast.message || "",
+        details: snapshotLast.details || "",
+        at: snapshotLast.at || (snapshot == null ? void 0 : snapshot.updatedAt) || (/* @__PURE__ */ new Date()).toISOString()
+      };
+    }
+    const sync = (embedBlock == null ? void 0 : embedBlock.sync) || {};
+    return {
+      status: sync.status || "idle",
+      mode: sync.mode || "manual",
+      message: sync.message || "",
+      details: sync.details || "",
+      at: sync.lastUpdatedAt || (/* @__PURE__ */ new Date()).toISOString()
+    };
   }
   function resolveRuntimeError(pipelineError, auth) {
     const code = typeof (pipelineError == null ? void 0 : pipelineError.code) === "string" && pipelineError.code ? pipelineError.code : "UNKNOWN";
@@ -2505,6 +2684,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     const [embedBlock, setEmbedBlock] = useSyncedState("embed-block", null);
     const [embedSnapshot, setEmbedSnapshot] = useSyncedState("embed-snapshot", null);
     const [authContext, setAuthContext] = useSyncedState("auth-context", null);
+    const [autoRefreshMap, setAutoRefreshMap] = useSyncedState(
+      "auto-refresh-map",
+      {}
+    );
     function postRuntimeStatus(level, message, details = "", extras = {}) {
       figma.ui.postMessage({
         type: UI_EVENT.RUNTIME_STATUS,
@@ -2514,15 +2697,145 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         ...extras
       });
     }
+    async function runPreviewPipeline(url, trigger, options = {}) {
+      var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      const mode = options.mode === SYNC_MODE.AUTO ? SYNC_MODE.AUTO : SYNC_MODE.MANUAL;
+      const normalizedUrl = typeof url === "string" ? url.trim() : "";
+      if (!normalizedUrl) {
+        setStatus("Sync error: MISSING_URL");
+        postRuntimeStatus("error", "A GitHub file URL is required.");
+        return { ok: false, skipped: true };
+      }
+      const sourceKeyForRun = typeof options.sourceKey === "string" && options.sourceKey ? options.sourceKey : deriveSourceKey(normalizedUrl, embedBlock, embedSnapshot, authContext);
+      let lockAcquired = false;
+      if (!options.skipManualLock) {
+        const lock = syncCoordinator.beginManual({
+          sourceKey: sourceKeyForRun,
+          syncStatus: (_a2 = embedBlock == null ? void 0 : embedBlock.sync) == null ? void 0 : _a2.status
+        });
+        if (!lock.ok) {
+          setStatus("Syncing...");
+          postRuntimeStatus("loading", "Syncing...", "", {
+            reason: lock.reason
+          });
+          return { ok: false, skipped: true, reason: lock.reason };
+        }
+        lockAcquired = true;
+      }
+      try {
+        setStatus(mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
+        postRuntimeStatus("loading", mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
+        if (mode === SYNC_MODE.MANUAL) {
+          figma.notify("Syncing...");
+        }
+        const patStore = await getRuntimePatStore();
+        const pipeline = await createOrRefreshEmbedFromUrl({
+          url: normalizedUrl,
+          currentEmbedBlock: embedBlock,
+          currentSnapshot: embedSnapshot,
+          patStore,
+          mode
+        });
+        if (!pipeline.ok) {
+          if ((_b = pipeline.value) == null ? void 0 : _b.embedBlock) {
+            setEmbedBlock(pipeline.value.embedBlock);
+          }
+          if ((_c = pipeline.value) == null ? void 0 : _c.snapshot) {
+            setEmbedSnapshot(pipeline.value.snapshot);
+          }
+          const runtimeError = resolveRuntimeError(pipeline.error, pipeline.auth);
+          const nextAuthContext = runtimeError.authRequired && runtimeError.sourceKey ? {
+            sourceKey: runtimeError.sourceKey,
+            code: runtimeError.code,
+            url: normalizedUrl
+          } : null;
+          setAuthContext(nextAuthContext);
+          const lastResult3 = buildLastResult(
+            (_d = pipeline.value) == null ? void 0 : _d.snapshot,
+            (_e = pipeline.value) == null ? void 0 : _e.embedBlock
+          );
+          setStatus(`Sync error: ${runtimeError.code}`);
+          postRuntimeStatus("error", runtimeError.message, runtimeError.details, {
+            code: runtimeError.code,
+            sourceKey: runtimeError.sourceKey,
+            authRequired: runtimeError.authRequired,
+            syncState: ((_h = (_g = (_f = pipeline.value) == null ? void 0 : _f.embedBlock) == null ? void 0 : _g.sync) == null ? void 0 : _h.status) || "error",
+            lastResult: lastResult3
+          });
+          if (mode === SYNC_MODE.MANUAL) {
+            figma.notify(runtimeError.message, { error: true });
+          }
+          return pipeline;
+        }
+        setLastUrl(normalizedUrl);
+        setEmbedBlock(pipeline.value.embedBlock);
+        setEmbedSnapshot(pipeline.value.snapshot);
+        setAuthContext(null);
+        const lastResult2 = buildLastResult(pipeline.value.snapshot, pipeline.value.embedBlock);
+        const successMessage = mode === SYNC_MODE.AUTO ? "Auto-sync completed." : "Preview created.";
+        setStatus(mode === SYNC_MODE.AUTO ? `Auto-sync ready (${trigger})` : `Preview ready (${trigger})`);
+        postRuntimeStatus("success", successMessage, "", {
+          syncState: ((_j = (_i = pipeline.value.embedBlock) == null ? void 0 : _i.sync) == null ? void 0 : _j.status) || "success",
+          lastResult: lastResult2
+        });
+        if (mode === SYNC_MODE.MANUAL) {
+          figma.notify("Preview created.");
+        }
+        return pipeline;
+      } finally {
+        if (lockAcquired) {
+          syncCoordinator.endManual(sourceKeyForRun);
+        }
+      }
+    }
+    function maybeRunAutoRefresh(origin) {
+      var _a2;
+      if (typeof lastUrl !== "string" || !lastUrl.trim()) {
+        return false;
+      }
+      const sourceKey = deriveSourceKey(lastUrl, embedBlock, embedSnapshot, authContext);
+      const lastAutoRefreshAtMs = Number((autoRefreshMap == null ? void 0 : autoRefreshMap[sourceKey]) || 0);
+      const decision = shouldRunAutoRefresh(
+        {
+          sourceKey,
+          sourceUrl: lastUrl,
+          syncStatus: (_a2 = embedBlock == null ? void 0 : embedBlock.sync) == null ? void 0 : _a2.status,
+          lastAutoRefreshAtMs,
+          nowMs: Date.now()
+        },
+        {
+          cooldownMs: syncCoordinator.cooldownMs
+        }
+      );
+      if (!decision.ok) {
+        return false;
+      }
+      setAutoRefreshMap({
+        ...autoRefreshMap || {},
+        [sourceKey]: decision.nowMs
+      });
+      void runPreviewPipeline(lastUrl, `auto-${origin}`, {
+        mode: SYNC_MODE.AUTO,
+        skipManualLock: true,
+        sourceKey
+      });
+      return true;
+    }
     usePropertyMenu(
       [
         {
           itemType: "action",
           tooltip: "Set GitHub URL",
           propertyName: "open-url"
+        },
+        {
+          itemType: "action",
+          tooltip: "Refresh preview",
+          propertyName: "refresh-now"
         }
       ],
       (event) => {
+        var _a2;
         if (event.propertyName === "open-url") {
           openWidgetUi();
           figma.ui.postMessage({
@@ -2530,55 +2843,27 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             widgetId: "active-widget",
             lastUrl,
             status,
-            authContext
+            authContext,
+            lastResult: buildLastResult(embedSnapshot, embedBlock),
+            syncState: ((_a2 = embedBlock == null ? void 0 : embedBlock.sync) == null ? void 0 : _a2.status) || "idle"
+          });
+          void maybeRunAutoRefresh("open-url");
+          return;
+        }
+        if (event.propertyName === "refresh-now") {
+          if (!lastUrl) {
+            setStatus("Refresh blocked: no URL set");
+            postRuntimeStatus("error", "No URL available for refresh.");
+            figma.notify("No URL available for refresh.", { error: true });
+            return;
+          }
+          void runPreviewPipeline(lastUrl, "property-menu-refresh", {
+            mode: SYNC_MODE.MANUAL
           });
         }
       }
     );
     useEffect(() => {
-      const runPreviewPipeline = async (url, trigger) => {
-        var _a2, _b;
-        setStatus("Syncing...");
-        postRuntimeStatus("loading", "Syncing...");
-        figma.notify("Syncing...");
-        const patStore = await getRuntimePatStore();
-        const pipeline = await createOrRefreshEmbedFromUrl({
-          url,
-          currentEmbedBlock: embedBlock,
-          currentSnapshot: embedSnapshot,
-          patStore
-        });
-        if (!pipeline.ok) {
-          if ((_a2 = pipeline.value) == null ? void 0 : _a2.embedBlock) {
-            setEmbedBlock(pipeline.value.embedBlock);
-          }
-          if ((_b = pipeline.value) == null ? void 0 : _b.snapshot) {
-            setEmbedSnapshot(pipeline.value.snapshot);
-          }
-          const runtimeError = resolveRuntimeError(pipeline.error, pipeline.auth);
-          const nextAuthContext = runtimeError.authRequired && runtimeError.sourceKey ? {
-            sourceKey: runtimeError.sourceKey,
-            code: runtimeError.code,
-            url
-          } : null;
-          setAuthContext(nextAuthContext);
-          setStatus(`Sync error: ${runtimeError.code}`);
-          postRuntimeStatus("error", runtimeError.message, runtimeError.details, {
-            code: runtimeError.code,
-            sourceKey: runtimeError.sourceKey,
-            authRequired: runtimeError.authRequired
-          });
-          figma.notify(runtimeError.message, { error: true });
-          return;
-        }
-        setLastUrl(url);
-        setEmbedBlock(pipeline.value.embedBlock);
-        setEmbedSnapshot(pipeline.value.snapshot);
-        setAuthContext(null);
-        setStatus(`Preview ready (${trigger})`);
-        postRuntimeStatus("success", "Preview created.");
-        figma.notify("Preview created.");
-      };
       figma.ui.onmessage = (message) => {
         const parsed = parseUiCommand(message);
         if (!parsed.ok) {
@@ -2589,7 +2874,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         }
         const command = parsed.value;
         if (command.type === UI_COMMAND.CREATE_PREVIEW) {
-          void runPreviewPipeline(command.url, "create");
+          void runPreviewPipeline(command.url, "create", {
+            mode: SYNC_MODE.MANUAL
+          });
           return;
         }
         if (command.type === UI_COMMAND.REFRESH_PREVIEW) {
@@ -2600,7 +2887,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             figma.notify("No URL available for refresh.", { error: true });
             return;
           }
-          void runPreviewPipeline(refreshUrl, "refresh");
+          void runPreviewPipeline(refreshUrl, "refresh", {
+            mode: SYNC_MODE.MANUAL
+          });
           return;
         }
         if (command.type === UI_COMMAND.SUBMIT_PAT) {
@@ -2611,14 +2900,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             const retryUrl = (authContext && typeof authContext === "object" && authContext.sourceKey === command.sourceKey && typeof authContext.url === "string" ? authContext.url : "") || lastUrl;
             if (!retryUrl) {
               setStatus("PAT saved, waiting for URL");
-              postRuntimeStatus(
-                "success",
-                "PAT guardado para este fichero.",
-                "",
-                {
-                  sourceKey: command.sourceKey
-                }
-              );
+              postRuntimeStatus("success", "PAT guardado para este fichero.", "", {
+                sourceKey: command.sourceKey
+              });
               figma.notify("PAT guardado para este fichero.");
               return;
             }
@@ -2627,7 +2911,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
               sourceKey: command.sourceKey
             });
             figma.notify("Reintentando con PAT actualizado...");
-            await runPreviewPipeline(retryUrl, "pat-retry");
+            await runPreviewPipeline(retryUrl, "pat-retry", {
+              mode: SYNC_MODE.MANUAL,
+              sourceKey: command.sourceKey
+            });
           })();
           return;
         }
@@ -2647,10 +2934,15 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           })();
         }
       };
+      if (!autoRefreshBootstrapped && lastUrl) {
+        autoRefreshBootstrapped = true;
+        void maybeRunAutoRefresh("resume");
+      }
       return () => {
         figma.ui.onmessage = void 0;
       };
     });
+    const lastResult = buildLastResult(embedSnapshot, embedBlock);
     return h(
       AutoLayout,
       {
@@ -2683,6 +2975,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         Text,
         { fontSize: 10, fill: "#8B8B8B" },
         embedSnapshot ? `Warnings: ${embedSnapshot.warningCount || 0} \xB7 Progressive: ${((_a = embedSnapshot.render) == null ? void 0 : _a.progressive) ? "yes" : "no"}` : "Warnings: 0 \xB7 Progressive: no"
+      ),
+      h(
+        Text,
+        { fontSize: 10, fill: "#8B8B8B" },
+        `Last result: ${lastResult.status || "idle"} (${lastResult.mode || "manual"})`
       )
     );
   }

@@ -8,11 +8,40 @@ function buildRenderSnapshot(preview = {}) {
   };
 }
 
+function buildLastResultSnapshot(input = {}) {
+  const base = input.lastResult && typeof input.lastResult === "object" ? input.lastResult : {};
+  const status =
+    typeof base.status === "string" && base.status
+      ? base.status
+      : typeof input.syncState === "string" && input.syncState
+        ? input.syncState
+        : "idle";
+
+  return {
+    status,
+    mode: typeof base.mode === "string" && base.mode ? base.mode : "manual",
+    message: typeof base.message === "string" ? base.message : "",
+    details: typeof base.details === "string" ? base.details : "",
+    at:
+      typeof base.at === "string" && base.at
+        ? base.at
+        : typeof input.updatedAt === "string" && input.updatedAt
+          ? input.updatedAt
+          : new Date().toISOString(),
+  };
+}
+
 function buildWidgetSnapshot(input = {}) {
   const block = input.embedBlock || {};
   const warnings = Array.isArray(input.warnings)
     ? input.warnings.filter((warning) => typeof warning === "string" && warning.trim())
     : [];
+
+  const syncState = block.sync?.status || "idle";
+  const updatedAt =
+    typeof input.updatedAt === "string" && input.updatedAt
+      ? input.updatedAt
+      : new Date().toISOString();
 
   return {
     version: 1,
@@ -21,7 +50,7 @@ function buildWidgetSnapshot(input = {}) {
         ? block.sourceKey
         : String(input.sourceKey || ""),
     sourceUrl: typeof input.sourceUrl === "string" ? input.sourceUrl : "",
-    syncState: block.sync?.status || "idle",
+    syncState,
     lastSync: block.sync?.lastSyncAt || null,
     warnings,
     warningCount: warnings.length,
@@ -33,10 +62,19 @@ function buildWidgetSnapshot(input = {}) {
           : null,
       cacheHit: Boolean(input.metrics?.cacheHit),
     },
-    updatedAt:
-      typeof input.updatedAt === "string" && input.updatedAt
-        ? input.updatedAt
-        : new Date().toISOString(),
+    lastResult: buildLastResultSnapshot({
+      lastResult:
+        input.lastResult || {
+          status: block.sync?.status || "idle",
+          mode: block.sync?.mode || "manual",
+          message: block.sync?.message || "",
+          details: block.sync?.details || "",
+          at: block.sync?.lastUpdatedAt || updatedAt,
+        },
+      syncState,
+      updatedAt,
+    }),
+    updatedAt,
   };
 }
 
@@ -45,6 +83,11 @@ function mergeWidgetSnapshot(previousSnapshot, patch = {}) {
     previousSnapshot && typeof previousSnapshot === "object" ? previousSnapshot : {};
 
   const hasField = (name) => Object.prototype.hasOwnProperty.call(patch, name);
+
+  const updatedAt =
+    typeof patch.updatedAt === "string" && patch.updatedAt
+      ? patch.updatedAt
+      : new Date().toISOString();
 
   return {
     version: 1,
@@ -80,10 +123,18 @@ function mergeWidgetSnapshot(previousSnapshot, patch = {}) {
       ...(previous.metrics || {}),
       ...(patch.metrics || {}),
     },
-    updatedAt:
-      typeof patch.updatedAt === "string" && patch.updatedAt
-        ? patch.updatedAt
-        : new Date().toISOString(),
+    lastResult: buildLastResultSnapshot({
+      lastResult: {
+        ...(previous.lastResult || {}),
+        ...(patch.lastResult || {}),
+      },
+      syncState:
+        typeof patch.syncState === "string" && patch.syncState
+          ? patch.syncState
+          : previous.syncState || "idle",
+      updatedAt,
+    }),
+    updatedAt,
   };
 }
 

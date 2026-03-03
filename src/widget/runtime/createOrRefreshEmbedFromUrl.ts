@@ -98,6 +98,8 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
 
   const now = resolveNow(input.now);
   const nowOptions = { now };
+  const mode =
+    input.mode === SYNC_MODE.AUTO ? SYNC_MODE.AUTO : SYNC_MODE.MANUAL;
   const previousSnapshot = input.currentSnapshot || null;
 
   const baseBlockResult = input.currentEmbedBlock
@@ -121,7 +123,7 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
     baseBlock.sync,
     {
       type: "start",
-      mode: SYNC_MODE.MANUAL,
+      mode,
     },
     nowOptions
   );
@@ -156,7 +158,7 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
       syncingBlock.sync,
       {
         type: "error",
-        mode: SYNC_MODE.MANUAL,
+        mode,
         message: error.message,
         details: error.details,
       },
@@ -177,6 +179,12 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
         embedBlock: failedBlock,
         sourceUrl: url,
         warnings: failedBlock.preview?.warnings || [],
+        lastResult: {
+          status: failedBlock.sync?.status || "error",
+          mode: failedBlock.sync?.mode || mode,
+          message: failedBlock.sync?.message || error.message,
+          details: failedBlock.sync?.details || error.details,
+        },
         updatedAt: now,
       })
     );
@@ -210,7 +218,7 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
       syncingBlock.sync,
       {
         type: "error",
-        mode: SYNC_MODE.MANUAL,
+        mode,
         message: error.message,
         details: error.details,
       },
@@ -231,6 +239,12 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
         embedBlock: failedBlock,
         sourceUrl: url,
         warnings: failedBlock.preview?.warnings || [],
+        lastResult: {
+          status: failedBlock.sync?.status || "error",
+          mode: failedBlock.sync?.mode || mode,
+          message: failedBlock.sync?.message || error.message,
+          details: failedBlock.sync?.details || error.details,
+        },
         updatedAt: now,
       })
     );
@@ -274,8 +288,15 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
     syncingBlock.sync,
     {
       type: "success",
-      mode: SYNC_MODE.MANUAL,
-      message: warnings.length > 0 ? "Preview updated with warnings" : "Preview created",
+      mode,
+      message:
+        warnings.length > 0
+          ? mode === SYNC_MODE.AUTO
+            ? "Auto-sync completado con advertencias"
+            : "Preview updated with warnings"
+          : mode === SYNC_MODE.AUTO
+            ? "Auto-sync completado"
+            : "Preview created",
       details: warningDetail,
       syncedAt: now,
     },
@@ -303,6 +324,12 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
       sourceUrl: url,
       warnings,
       metrics: preview?.metrics || null,
+      lastResult: {
+        status: updatedBlock.sync?.status || "success",
+        mode: updatedBlock.sync?.mode || mode,
+        message: updatedBlock.sync?.message || "Preview created",
+        details: updatedBlock.sync?.details || "",
+      },
       updatedAt: now,
     })
   );

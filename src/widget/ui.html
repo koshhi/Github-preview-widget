@@ -67,10 +67,19 @@
         color: #0c4a6e;
       }
 
+      .status.success {
+        color: #166534;
+      }
+
       .details {
         font-size: 10px;
         color: #7c2d12;
         word-break: break-word;
+        display: none;
+      }
+
+      .details[data-open="true"] {
+        display: block;
       }
 
       .actions {
@@ -108,6 +117,22 @@
         color: #9a3412;
         word-break: break-word;
       }
+
+      .link-button {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-size: 11px;
+        text-decoration: underline;
+        color: #0f172a;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .result-meta {
+        font-size: 10px;
+        color: #475569;
+      }
     </style>
   </head>
   <body>
@@ -119,7 +144,9 @@
         <button class="secondary" id="refresh-button" type="button">Refresh preview</button>
       </div>
       <div class="status" id="status-line">Ready</div>
-      <div class="details" id="details-line"></div>
+      <div class="result-meta" id="result-line">State: idle</div>
+      <button class="link-button" id="toggle-details-button" type="button">Show details</button>
+      <div class="details" id="details-line" data-open="false"></div>
       <div class="auth-panel" id="auth-panel" data-open="false">
         <div class="auth-title">Private file requires PAT</div>
         <div class="auth-copy" id="auth-copy"></div>
@@ -142,12 +169,15 @@
       const savePatButton = document.getElementById("save-pat-button");
       const forgetPatButton = document.getElementById("forget-pat-button");
       const statusLine = document.getElementById("status-line");
+      const resultLine = document.getElementById("result-line");
+      const toggleDetailsButton = document.getElementById("toggle-details-button");
       const detailsLine = document.getElementById("details-line");
       const authPanel = document.getElementById("auth-panel");
       const authCopy = document.getElementById("auth-copy");
       const authMeta = document.getElementById("auth-meta");
       let activeWidgetId = "active-widget";
       let activeAuthContext = null;
+      let detailsOpen = false;
 
       const AUTH_MESSAGES = {
         MISSING_PAT:
@@ -156,14 +186,31 @@
         CURRENT_PAT: "Tu personal access token no tiene permisos/scope suficiente.",
       };
 
+      function updateDetailsVisibility() {
+        detailsLine.dataset.open = detailsOpen ? "true" : "false";
+        toggleDetailsButton.textContent = detailsOpen ? "Hide details" : "Show details";
+      }
+
       function setStatus(level, message, details = "") {
         statusLine.textContent = message || "Ready";
         statusLine.className = `status ${level || ""}`.trim();
         detailsLine.textContent = details || "";
+        if (!details) {
+          detailsOpen = false;
+        }
+        updateDetailsVisibility();
 
         const isLoading = level === "loading";
         submitButton.disabled = isLoading;
         refreshButton.disabled = isLoading;
+      }
+
+      function setLastResult(lastResult, syncState) {
+        const safe = lastResult && typeof lastResult === "object" ? lastResult : {};
+        const status = safe.status || syncState || "idle";
+        const mode = safe.mode || "manual";
+        const message = safe.message ? ` · ${safe.message}` : "";
+        resultLine.textContent = `State: ${status} (${mode})${message}`;
       }
 
       function setAuthPanel(open, payload = null) {
@@ -211,6 +258,11 @@
           },
           "*"
         );
+      });
+
+      toggleDetailsButton.addEventListener("click", () => {
+        detailsOpen = !detailsOpen;
+        updateDetailsVisibility();
       });
 
       savePatButton.addEventListener("click", () => {
@@ -273,6 +325,7 @@
           if (typeof payload.status === "string" && payload.status.length > 0) {
             setStatus("", payload.status);
           }
+          setLastResult(payload.lastResult, payload.syncState);
 
           if (payload.authContext && typeof payload.authContext === "object") {
             setAuthPanel(true, payload.authContext);
@@ -284,6 +337,7 @@
 
         if (payload.type === "runtime-status") {
           setStatus(payload.level, payload.message, payload.details);
+          setLastResult(payload.lastResult, payload.syncState);
           if (payload.authRequired && typeof payload.sourceKey === "string") {
             setAuthPanel(true, payload);
           } else if (payload.level === "success") {
@@ -291,6 +345,8 @@
           }
         }
       };
+
+      updateDetailsVisibility();
     </script>
   </body>
 </html>

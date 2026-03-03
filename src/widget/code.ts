@@ -8,6 +8,11 @@ const {
   loadPatSessionStore,
 } = require("./runtime/patSessionStore.ts");
 const { redactSensitive } = require("./runtime/redactSensitive.ts");
+const {
+  createSyncCoordinator,
+  shouldRunAutoRefresh,
+} = require("./runtime/syncCoordinator.ts");
+const { SYNC_MODE } = require("../core/canvas/types.ts");
 
 const { widget } = figma;
 const { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
@@ -27,7 +32,10 @@ const AUTH_MESSAGES = Object.freeze({
     "Tu personal access token no tiene permisos/scope suficiente.",
 });
 
+const syncCoordinator = createSyncCoordinator({ cooldownMs: 60_000 });
+
 let runtimePatStorePromise = null;
+let autoRefreshBootstrapped = false;
 
 function getRuntimePatStore() {
   if (!runtimePatStorePromise) {
@@ -42,9 +50,47 @@ function getRuntimePatStore() {
 function openWidgetUi() {
   figma.showUI(__html__, {
     width: 420,
-    height: 360,
+    height: 420,
     title: "GitHub Preview Widget",
   });
+}
+
+function deriveSourceKey(url, embedBlock, embedSnapshot, authContext) {
+  if (typeof embedBlock?.sourceKey === "string" && embedBlock.sourceKey) {
+    return embedBlock.sourceKey;
+  }
+  if (typeof embedSnapshot?.sourceKey === "string" && embedSnapshot.sourceKey) {
+    return embedSnapshot.sourceKey;
+  }
+  if (typeof authContext?.sourceKey === "string" && authContext.sourceKey) {
+    return authContext.sourceKey;
+  }
+  if (typeof url === "string") {
+    return url.trim();
+  }
+  return "";
+}
+
+function buildLastResult(snapshot, embedBlock) {
+  const snapshotLast = snapshot?.lastResult;
+  if (snapshotLast && typeof snapshotLast === "object") {
+    return {
+      status: snapshotLast.status || "idle",
+      mode: snapshotLast.mode || "manual",
+      message: snapshotLast.message || "",
+      details: snapshotLast.details || "",
+      at: snapshotLast.at || snapshot?.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  const sync = embedBlock?.sync || {};
+  return {
+    status: sync.status || "idle",
+    mode: sync.mode || "manual",
+    message: sync.message || "",
+    details: sync.details || "",
+    at: sync.lastUpdatedAt || new Date().toISOString(),
+  };
 }
 
 function resolveRuntimeError(pipelineError, auth) {
@@ -82,6 +128,10 @@ function GitHubPreviewWidget() {
   const [embedBlock, setEmbedBlock] = useSyncedState("embed-block", null);
   const [embedSnapshot, setEmbedSnapshot] = useSyncedState("embed-snapshot", null);
   const [authContext, setAuthContext] = useSyncedState("auth-context", null);
+  const [autoRefreshMap, setAutoRefreshMap] = useSyncedState(
+    "auto-refresh-map",
+    {}
+  );
 
   function postRuntimeStatus(level, message, details = "", extras = {}) {
     figma.ui.postMessage({
@@ -93,40 +143,52 @@ function GitHubPreviewWidget() {
     });
   }
 
-  usePropertyMenu(
-    [
-      {
-        itemType: "action",
-        tooltip: "Set GitHub URL",
-        propertyName: "open-url",
-      },
-    ],
-    (event) => {
-      if (event.propertyName === "open-url") {
-        openWidgetUi();
-        figma.ui.postMessage({
-          type: UI_EVENT.WIDGET_CONTEXT,
-          widgetId: "active-widget",
-          lastUrl,
-          status,
-          authContext,
-        });
-      }
+  async function runPreviewPipeline(url, trigger, options = {}) {
+    const mode = options.mode === SYNC_MODE.AUTO ? SYNC_MODE.AUTO : SYNC_MODE.MANUAL;
+    const normalizedUrl = typeof url === "string" ? url.trim() : "";
+    if (!normalizedUrl) {
+      setStatus("Sync error: MISSING_URL");
+      postRuntimeStatus("error", "A GitHub file URL is required.");
+      return { ok: false, skipped: true };
     }
-  );
 
-  useEffect(() => {
-    const runPreviewPipeline = async (url, trigger) => {
-      setStatus("Syncing...");
-      postRuntimeStatus("loading", "Syncing...");
-      figma.notify("Syncing...");
+    const sourceKeyForRun =
+      typeof options.sourceKey === "string" && options.sourceKey
+        ? options.sourceKey
+        : deriveSourceKey(normalizedUrl, embedBlock, embedSnapshot, authContext);
+
+    let lockAcquired = false;
+    if (!options.skipManualLock) {
+      const lock = syncCoordinator.beginManual({
+        sourceKey: sourceKeyForRun,
+        syncStatus: embedBlock?.sync?.status,
+      });
+
+      if (!lock.ok) {
+        setStatus("Syncing...");
+        postRuntimeStatus("loading", "Syncing...", "", {
+          reason: lock.reason,
+        });
+        return { ok: false, skipped: true, reason: lock.reason };
+      }
+
+      lockAcquired = true;
+    }
+
+    try {
+      setStatus(mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
+      postRuntimeStatus("loading", mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
+      if (mode === SYNC_MODE.MANUAL) {
+        figma.notify("Syncing...");
+      }
 
       const patStore = await getRuntimePatStore();
       const pipeline = await createOrRefreshEmbedFromUrl({
-        url,
+        url: normalizedUrl,
         currentEmbedBlock: embedBlock,
         currentSnapshot: embedSnapshot,
         patStore,
+        mode,
       });
 
       if (!pipeline.ok) {
@@ -143,30 +205,142 @@ function GitHubPreviewWidget() {
             ? {
                 sourceKey: runtimeError.sourceKey,
                 code: runtimeError.code,
-                url,
+                url: normalizedUrl,
               }
             : null;
         setAuthContext(nextAuthContext);
+
+        const lastResult = buildLastResult(
+          pipeline.value?.snapshot,
+          pipeline.value?.embedBlock
+        );
 
         setStatus(`Sync error: ${runtimeError.code}`);
         postRuntimeStatus("error", runtimeError.message, runtimeError.details, {
           code: runtimeError.code,
           sourceKey: runtimeError.sourceKey,
           authRequired: runtimeError.authRequired,
+          syncState: pipeline.value?.embedBlock?.sync?.status || "error",
+          lastResult,
         });
-        figma.notify(runtimeError.message, { error: true });
-        return;
+
+        if (mode === SYNC_MODE.MANUAL) {
+          figma.notify(runtimeError.message, { error: true });
+        }
+        return pipeline;
       }
 
-      setLastUrl(url);
+      setLastUrl(normalizedUrl);
       setEmbedBlock(pipeline.value.embedBlock);
       setEmbedSnapshot(pipeline.value.snapshot);
       setAuthContext(null);
-      setStatus(`Preview ready (${trigger})`);
-      postRuntimeStatus("success", "Preview created.");
-      figma.notify("Preview created.");
-    };
 
+      const lastResult = buildLastResult(pipeline.value.snapshot, pipeline.value.embedBlock);
+      const successMessage =
+        mode === SYNC_MODE.AUTO ? "Auto-sync completed." : "Preview created.";
+
+      setStatus(mode === SYNC_MODE.AUTO ? `Auto-sync ready (${trigger})` : `Preview ready (${trigger})`);
+      postRuntimeStatus("success", successMessage, "", {
+        syncState: pipeline.value.embedBlock?.sync?.status || "success",
+        lastResult,
+      });
+
+      if (mode === SYNC_MODE.MANUAL) {
+        figma.notify("Preview created.");
+      }
+
+      return pipeline;
+    } finally {
+      if (lockAcquired) {
+        syncCoordinator.endManual(sourceKeyForRun);
+      }
+    }
+  }
+
+  function maybeRunAutoRefresh(origin) {
+    if (typeof lastUrl !== "string" || !lastUrl.trim()) {
+      return false;
+    }
+
+    const sourceKey = deriveSourceKey(lastUrl, embedBlock, embedSnapshot, authContext);
+    const lastAutoRefreshAtMs = Number(autoRefreshMap?.[sourceKey] || 0);
+    const decision = shouldRunAutoRefresh(
+      {
+        sourceKey,
+        sourceUrl: lastUrl,
+        syncStatus: embedBlock?.sync?.status,
+        lastAutoRefreshAtMs,
+        nowMs: Date.now(),
+      },
+      {
+        cooldownMs: syncCoordinator.cooldownMs,
+      }
+    );
+
+    if (!decision.ok) {
+      return false;
+    }
+
+    setAutoRefreshMap({
+      ...(autoRefreshMap || {}),
+      [sourceKey]: decision.nowMs,
+    });
+
+    void runPreviewPipeline(lastUrl, `auto-${origin}`, {
+      mode: SYNC_MODE.AUTO,
+      skipManualLock: true,
+      sourceKey,
+    });
+
+    return true;
+  }
+
+  usePropertyMenu(
+    [
+      {
+        itemType: "action",
+        tooltip: "Set GitHub URL",
+        propertyName: "open-url",
+      },
+      {
+        itemType: "action",
+        tooltip: "Refresh preview",
+        propertyName: "refresh-now",
+      },
+    ],
+    (event) => {
+      if (event.propertyName === "open-url") {
+        openWidgetUi();
+        figma.ui.postMessage({
+          type: UI_EVENT.WIDGET_CONTEXT,
+          widgetId: "active-widget",
+          lastUrl,
+          status,
+          authContext,
+          lastResult: buildLastResult(embedSnapshot, embedBlock),
+          syncState: embedBlock?.sync?.status || "idle",
+        });
+
+        void maybeRunAutoRefresh("open-url");
+        return;
+      }
+
+      if (event.propertyName === "refresh-now") {
+        if (!lastUrl) {
+          setStatus("Refresh blocked: no URL set");
+          postRuntimeStatus("error", "No URL available for refresh.");
+          figma.notify("No URL available for refresh.", { error: true });
+          return;
+        }
+
+        void runPreviewPipeline(lastUrl, "property-menu-refresh", {
+          mode: SYNC_MODE.MANUAL,
+        });
+      }
+    }
+  );
+
+  useEffect(() => {
     figma.ui.onmessage = (message) => {
       const parsed = parseUiCommand(message);
       if (!parsed.ok) {
@@ -178,7 +352,9 @@ function GitHubPreviewWidget() {
 
       const command = parsed.value;
       if (command.type === UI_COMMAND.CREATE_PREVIEW) {
-        void runPreviewPipeline(command.url, "create");
+        void runPreviewPipeline(command.url, "create", {
+          mode: SYNC_MODE.MANUAL,
+        });
         return;
       }
 
@@ -191,7 +367,9 @@ function GitHubPreviewWidget() {
           return;
         }
 
-        void runPreviewPipeline(refreshUrl, "refresh");
+        void runPreviewPipeline(refreshUrl, "refresh", {
+          mode: SYNC_MODE.MANUAL,
+        });
         return;
       }
 
@@ -211,14 +389,9 @@ function GitHubPreviewWidget() {
 
           if (!retryUrl) {
             setStatus("PAT saved, waiting for URL");
-            postRuntimeStatus(
-              "success",
-              "PAT guardado para este fichero.",
-              "",
-              {
-                sourceKey: command.sourceKey,
-              }
-            );
+            postRuntimeStatus("success", "PAT guardado para este fichero.", "", {
+              sourceKey: command.sourceKey,
+            });
             figma.notify("PAT guardado para este fichero.");
             return;
           }
@@ -228,7 +401,10 @@ function GitHubPreviewWidget() {
             sourceKey: command.sourceKey,
           });
           figma.notify("Reintentando con PAT actualizado...");
-          await runPreviewPipeline(retryUrl, "pat-retry");
+          await runPreviewPipeline(retryUrl, "pat-retry", {
+            mode: SYNC_MODE.MANUAL,
+            sourceKey: command.sourceKey,
+          });
         })();
         return;
       }
@@ -256,10 +432,17 @@ function GitHubPreviewWidget() {
       }
     };
 
+    if (!autoRefreshBootstrapped && lastUrl) {
+      autoRefreshBootstrapped = true;
+      void maybeRunAutoRefresh("resume");
+    }
+
     return () => {
       figma.ui.onmessage = undefined;
     };
   });
+
+  const lastResult = buildLastResult(embedSnapshot, embedBlock);
 
   return h(
     AutoLayout,
@@ -299,6 +482,11 @@ function GitHubPreviewWidget() {
       embedSnapshot
         ? `Warnings: ${embedSnapshot.warningCount || 0} · Progressive: ${embedSnapshot.render?.progressive ? "yes" : "no"}`
         : "Warnings: 0 · Progressive: no"
+    ),
+    h(
+      Text,
+      { fontSize: 10, fill: "#8B8B8B" },
+      `Last result: ${lastResult.status || "idle"} (${lastResult.mode || "manual"})`
     )
   );
 }
