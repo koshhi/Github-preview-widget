@@ -10,7 +10,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 5 | 1/1 | Complete   | 2026-03-03 | 4 |
+| 5 | Widget Runtime Bootstrap | Complete (2026-03-03) | WDG-01, WDG-02, QLT-04 | 4 |
 | 6 | End-to-End Widget Rendering | Conectar core con Widget API para crear embeds reales | WDG-03, INT-04, INT-05 | 4 |
 | 7 | Private Access & PAT Safety | Resolver flujo privado con PAT y restricciones de seguridad | SEC-01, SEC-02, SEC-03 | 4 |
 | 8 | Sync, UAT & Docs | Cerrar refresh in-place, estado sync y guía de uso real | SNC-07, SNC-08, SNC-09, QLT-05 | 5 |
@@ -85,4 +85,4 @@
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-03 after widget milestone alignment*
+*Last updated: 2026-03-03 after phase 5 execution*
