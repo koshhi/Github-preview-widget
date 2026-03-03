@@ -4,6 +4,7 @@ const { renderFilePreview } = require("../../core/render/renderFilePreview.ts");
 const { updateEmbedBlockInPlace } = require("../../core/canvas/updateEmbedBlock.ts");
 const { transitionSyncState } = require("../../core/canvas/syncState.ts");
 const { SYNC_MODE } = require("../../core/canvas/types.ts");
+const { redactSensitive } = require("./redactSensitive.ts");
 const {
   buildWidgetSnapshot,
   mergeWidgetSnapshot,
@@ -54,8 +55,8 @@ function normalizeError(errorLike, fallbackCode, fallbackMessage, fallbackDetail
 
   return {
     code: errorLike.code || fallbackCode,
-    message: errorLike.message || fallbackMessage,
-    details: errorLike.details || fallbackDetails,
+    message: redactSensitive(errorLike.message || fallbackMessage),
+    details: redactSensitive(errorLike.details || fallbackDetails),
   };
 }
 

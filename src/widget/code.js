@@ -1,4 +1,4 @@
-const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <button type=\"submit\">Create preview</button>\n      <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"details\" id=\"details-line\"></div>\n    </form>\n\n    <script>\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const detailsLine = document.getElementById(\"details-line\");\n      let activeWidgetId = \"active-widget\";\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n        }\n      };\n    </script>\n  </body>\n</html>\n";
+const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .danger {\n        background: #fee2e2;\n        color: #991b1b;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n      }\n\n      .actions {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 8px;\n      }\n\n      .auth-panel {\n        display: none;\n        border: 1px solid #fca5a5;\n        border-radius: 8px;\n        background: #fff1f2;\n        padding: 10px;\n        gap: 8px;\n      }\n\n      .auth-panel[data-open=\"true\"] {\n        display: grid;\n      }\n\n      .auth-title {\n        font-size: 11px;\n        font-weight: 700;\n        color: #9f1239;\n      }\n\n      .auth-copy {\n        font-size: 11px;\n        color: #7f1d1d;\n      }\n\n      .auth-meta {\n        font-size: 10px;\n        color: #9a3412;\n        word-break: break-word;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <div class=\"actions\">\n        <button type=\"submit\">Create preview</button>\n        <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      </div>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"details\" id=\"details-line\"></div>\n      <div class=\"auth-panel\" id=\"auth-panel\" data-open=\"false\">\n        <div class=\"auth-title\">Private file requires PAT</div>\n        <div class=\"auth-copy\" id=\"auth-copy\"></div>\n        <div class=\"auth-meta\" id=\"auth-meta\"></div>\n        <label class=\"label\" for=\"pat-input\">Personal access token</label>\n        <input id=\"pat-input\" type=\"password\" placeholder=\"ghp_xxx or github_pat_xxx\" />\n        <div class=\"actions\">\n          <button class=\"secondary\" id=\"save-pat-button\" type=\"button\">Guardar PAT y reintentar</button>\n          <button class=\"danger\" id=\"forget-pat-button\" type=\"button\">Olvidar PAT fichero</button>\n        </div>\n      </div>\n    </form>\n\n    <script>\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const patInput = document.getElementById(\"pat-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const savePatButton = document.getElementById(\"save-pat-button\");\n      const forgetPatButton = document.getElementById(\"forget-pat-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const detailsLine = document.getElementById(\"details-line\");\n      const authPanel = document.getElementById(\"auth-panel\");\n      const authCopy = document.getElementById(\"auth-copy\");\n      const authMeta = document.getElementById(\"auth-meta\");\n      let activeWidgetId = \"active-widget\";\n      let activeAuthContext = null;\n\n      const AUTH_MESSAGES = {\n        MISSING_PAT:\n          \"El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.\",\n        EXPIRED_PAT: \"Tu personal access token es invalido o ha expirado.\",\n        CURRENT_PAT: \"Tu personal access token no tiene permisos/scope suficiente.\",\n      };\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      function setAuthPanel(open, payload = null) {\n        if (!open || !payload || typeof payload.sourceKey !== \"string\") {\n          activeAuthContext = null;\n          authPanel.dataset.open = \"false\";\n          authCopy.textContent = \"\";\n          authMeta.textContent = \"\";\n          patInput.value = \"\";\n          savePatButton.disabled = false;\n          forgetPatButton.disabled = false;\n          return;\n        }\n\n        activeAuthContext = payload;\n        authPanel.dataset.open = \"true\";\n        authCopy.textContent =\n          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;\n        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      savePatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para guardar PAT.\");\n          return;\n        }\n\n        const token = patInput.value.trim();\n        if (!token) {\n          setStatus(\"error\", \"Introduce un PAT valido para continuar.\");\n          return;\n        }\n\n        setStatus(\"loading\", \"Reintentando con PAT...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"submit-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n              token,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      forgetPatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para olvidar PAT.\");\n          return;\n        }\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"forget-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n\n          if (payload.authContext && typeof payload.authContext === \"object\") {\n            setAuthPanel(true, payload.authContext);\n          } else {\n            setAuthPanel(false);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n          if (payload.authRequired && typeof payload.sourceKey === \"string\") {\n            setAuthPanel(true, payload);\n          } else if (payload.level === \"success\") {\n            setAuthPanel(false);\n          }\n        }\n      };\n    </script>\n  </body>\n</html>\n";
 (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __commonJS = (cb, mod) => function __require() {
@@ -10,7 +10,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     "src/widget/bridge/messages.ts"(exports, module) {
       var UI_COMMAND2 = Object.freeze({
         CREATE_PREVIEW: "create-preview",
-        REFRESH_PREVIEW: "refresh-preview"
+        REFRESH_PREVIEW: "refresh-preview",
+        SUBMIT_PAT: "submit-pat",
+        FORGET_PAT: "forget-pat"
       });
       var UI_EVENT2 = Object.freeze({
         WIDGET_CONTEXT: "widget-context",
@@ -28,11 +30,26 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           widgetId: String(widgetId || "").trim()
         };
       }
+      function createSubmitPatCommand(sourceKey, token) {
+        return {
+          type: UI_COMMAND2.SUBMIT_PAT,
+          sourceKey: String(sourceKey || "").trim(),
+          token: String(token || "").trim()
+        };
+      }
+      function createForgetPatCommand(sourceKey) {
+        return {
+          type: UI_COMMAND2.FORGET_PAT,
+          sourceKey: String(sourceKey || "").trim()
+        };
+      }
       module.exports = {
         UI_COMMAND: UI_COMMAND2,
         UI_EVENT: UI_EVENT2,
         createCreatePreviewCommand,
-        createRefreshPreviewCommand
+        createRefreshPreviewCommand,
+        createSubmitPatCommand,
+        createForgetPatCommand
       };
     }
   });
@@ -84,6 +101,40 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             value: {
               type: UI_COMMAND2.REFRESH_PREVIEW,
               widgetId: payload.widgetId.trim()
+            }
+          };
+        }
+        if (payload.type === UI_COMMAND2.SUBMIT_PAT) {
+          if (typeof payload.sourceKey !== "string" || payload.sourceKey.trim().length === 0) {
+            return fail(
+              "INVALID_SOURCE_KEY",
+              "submit-pat requires a non-empty sourceKey."
+            );
+          }
+          if (typeof payload.token !== "string" || payload.token.trim().length === 0) {
+            return fail("INVALID_PAT", "submit-pat requires a non-empty token.");
+          }
+          return {
+            ok: true,
+            value: {
+              type: UI_COMMAND2.SUBMIT_PAT,
+              sourceKey: payload.sourceKey.trim(),
+              token: payload.token.trim()
+            }
+          };
+        }
+        if (payload.type === UI_COMMAND2.FORGET_PAT) {
+          if (typeof payload.sourceKey !== "string" || payload.sourceKey.trim().length === 0) {
+            return fail(
+              "INVALID_SOURCE_KEY",
+              "forget-pat requires a non-empty sourceKey."
+            );
+          }
+          return {
+            ok: true,
+            value: {
+              type: UI_COMMAND2.FORGET_PAT,
+              sourceKey: payload.sourceKey.trim()
             }
           };
         }
@@ -1760,6 +1811,49 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     }
   });
 
+  // src/widget/runtime/redactSensitive.ts
+  var require_redactSensitive = __commonJS({
+    "src/widget/runtime/redactSensitive.ts"(exports, module) {
+      var REDACTED = "[REDACTED_TOKEN]";
+      var TOKEN_PATTERNS = [
+        /\bgh[pousr]_[A-Za-z0-9_]{8,}\b/gi,
+        /\bgithub_pat_[A-Za-z0-9_]{16,}\b/gi,
+        /\bBearer\s+[A-Za-z0-9._\-+/=]{8,}\b/gi,
+        /\btoken\s+[A-Za-z0-9._\-+/=]{8,}\b/gi
+      ];
+      function redactString(input) {
+        if (typeof input !== "string" || input.length === 0) {
+          return "";
+        }
+        let output = input;
+        for (const pattern of TOKEN_PATTERNS) {
+          output = output.replace(pattern, REDACTED);
+        }
+        return output;
+      }
+      function redactSensitive2(value) {
+        if (typeof value === "string") {
+          return redactString(value);
+        }
+        if (Array.isArray(value)) {
+          return value.map((entry) => redactSensitive2(entry));
+        }
+        if (value && typeof value === "object") {
+          const next = {};
+          for (const [key, entry] of Object.entries(value)) {
+            next[key] = redactSensitive2(entry);
+          }
+          return next;
+        }
+        return value;
+      }
+      module.exports = {
+        REDACTED,
+        redactSensitive: redactSensitive2
+      };
+    }
+  });
+
   // src/widget/runtime/persistWidgetSnapshot.ts
   var require_persistWidgetSnapshot = __commonJS({
     "src/widget/runtime/persistWidgetSnapshot.ts"(exports, module) {
@@ -1901,6 +1995,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       var { updateEmbedBlockInPlace } = require_updateEmbedBlock();
       var { transitionSyncState } = require_syncState();
       var { SYNC_MODE } = require_types2();
+      var { redactSensitive: redactSensitive2 } = require_redactSensitive();
       var {
         buildWidgetSnapshot,
         mergeWidgetSnapshot
@@ -1943,8 +2038,20 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         }
         return {
           code: errorLike.code || fallbackCode,
-          message: errorLike.message || fallbackMessage,
-          details: errorLike.details || fallbackDetails
+          message: redactSensitive2(errorLike.message || fallbackMessage),
+          details: redactSensitive2(errorLike.details || fallbackDetails)
+        };
+      }
+      function normalizeAuthState(authLike) {
+        if (!authLike || typeof authLike !== "object") {
+          return null;
+        }
+        return {
+          kind: typeof authLike.kind === "string" ? authLike.kind : null,
+          sourceKey: typeof authLike.sourceKey === "string" && authLike.sourceKey ? authLike.sourceKey : null,
+          usedPat: Boolean(authLike.usedPat),
+          retryCount: Number(authLike.retryCount || 0),
+          patStatus: typeof authLike.patStatus === "string" && authLike.patStatus ? authLike.patStatus : null
         };
       }
       async function createOrRefreshEmbedFromUrl2(input = {}, deps = {}) {
@@ -2034,6 +2141,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           return {
             ok: false,
             error,
+            auth: normalizeAuthState(readResult == null ? void 0 : readResult.auth),
             value: {
               embedBlock: failedBlock,
               snapshot: snapshot2
@@ -2129,6 +2237,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         );
         return {
           ok: true,
+          auth: normalizeAuthState(readResult == null ? void 0 : readResult.auth),
           value: {
             embedBlock: updatedBlock,
             snapshot,
@@ -2143,20 +2252,248 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     }
   });
 
+  // src/widget/runtime/patSessionStore.ts
+  var require_patSessionStore = __commonJS({
+    "src/widget/runtime/patSessionStore.ts"(exports, module) {
+      var { createPatStore } = require_patStore();
+      var DEFAULT_STORAGE_KEY = "github-preview-widget/pat-session/v1";
+      var DEFAULT_CIPHER_KEY = "github-preview-widget::pat-session";
+      function toBase64(bytes) {
+        if (typeof Buffer !== "undefined") {
+          return Buffer.from(bytes).toString("base64");
+        }
+        let binary = "";
+        for (const value of bytes) {
+          binary += String.fromCharCode(value);
+        }
+        return globalThis.btoa(binary);
+      }
+      function fromBase64(input) {
+        if (typeof input !== "string" || input.length === 0) {
+          return new Uint8Array(0);
+        }
+        if (typeof Buffer !== "undefined") {
+          return Uint8Array.from(Buffer.from(input, "base64"));
+        }
+        const binary = globalThis.atob(input);
+        const out = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          out[i] = binary.charCodeAt(i);
+        }
+        return out;
+      }
+      function xorBytes(payloadBytes, keyBytes) {
+        if (!(keyBytes instanceof Uint8Array) || keyBytes.length === 0) {
+          throw new TypeError("Cipher key must not be empty.");
+        }
+        const out = new Uint8Array(payloadBytes.length);
+        for (let i = 0; i < payloadBytes.length; i += 1) {
+          out[i] = payloadBytes[i] ^ keyBytes[i % keyBytes.length];
+        }
+        return out;
+      }
+      function encodePersistedRecords(records, cipherKey) {
+        const encoder = new TextEncoder();
+        const payload = JSON.stringify({
+          version: 1,
+          records: Array.isArray(records) ? records : []
+        });
+        const payloadBytes = encoder.encode(payload);
+        const keyBytes = encoder.encode(String(cipherKey || DEFAULT_CIPHER_KEY));
+        return toBase64(xorBytes(payloadBytes, keyBytes));
+      }
+      function decodePersistedRecords(input, cipherKey) {
+        if (typeof input !== "string" || input.trim() === "") {
+          return [];
+        }
+        try {
+          const bytes = fromBase64(input);
+          const decoder = new TextDecoder();
+          const keyBytes = new TextEncoder().encode(String(cipherKey || DEFAULT_CIPHER_KEY));
+          const plain = decoder.decode(xorBytes(bytes, keyBytes));
+          const parsed = JSON.parse(plain);
+          if (!Array.isArray(parsed == null ? void 0 : parsed.records)) {
+            return [];
+          }
+          return parsed.records;
+        } catch (_error) {
+          return [];
+        }
+      }
+      function normalizeRecord(record) {
+        const sourceKey = String((record == null ? void 0 : record.sourceKey) || "").trim();
+        const token = String((record == null ? void 0 : record.token) || "").trim();
+        if (!sourceKey || !token) return null;
+        return {
+          sourceKey,
+          token,
+          status: typeof (record == null ? void 0 : record.status) === "string" ? record.status : "unknown",
+          lastValidatedAt: typeof (record == null ? void 0 : record.lastValidatedAt) === "string" ? record.lastValidatedAt : void 0,
+          lastErrorCode: typeof (record == null ? void 0 : record.lastErrorCode) === "string" ? record.lastErrorCode : void 0
+        };
+      }
+      function isStorageLike(storage) {
+        return Boolean(
+          storage && typeof storage.getAsync === "function" && typeof storage.setAsync === "function"
+        );
+      }
+      function createPatSessionStore2(options = {}) {
+        const storage = options.storage;
+        const storageKey = typeof options.storageKey === "string" && options.storageKey ? options.storageKey : DEFAULT_STORAGE_KEY;
+        const cipherKey = typeof options.cipherKey === "string" && options.cipherKey ? options.cipherKey : DEFAULT_CIPHER_KEY;
+        const initialRecords = Array.isArray(options.initialRecords) ? options.initialRecords.map((record) => normalizeRecord(record)).filter(Boolean) : [];
+        const recordMap = new Map(initialRecords.map((record) => [record.sourceKey, record]));
+        const delegate = createPatStore(initialRecords);
+        let persistQueue = Promise.resolve();
+        function cloneRecords() {
+          return Array.from(recordMap.values()).map((entry) => ({ ...entry }));
+        }
+        function schedulePersist() {
+          if (!isStorageLike(storage)) {
+            return Promise.resolve(false);
+          }
+          const payload = encodePersistedRecords(cloneRecords(), cipherKey);
+          persistQueue = persistQueue.catch(() => {
+          }).then(() => storage.setAsync(storageKey, payload)).then(() => true).catch(() => false);
+          return persistQueue;
+        }
+        return {
+          get(sourceKey) {
+            return delegate.get(sourceKey);
+          },
+          set(sourceKey, token) {
+            const next = delegate.set(sourceKey, token);
+            if (next) {
+              recordMap.set(next.sourceKey, { ...next });
+              void schedulePersist();
+            }
+            return next;
+          },
+          markValid(sourceKey, validatedAt) {
+            const next = delegate.markValid(sourceKey, validatedAt);
+            if (next) {
+              recordMap.set(next.sourceKey, { ...next });
+              void schedulePersist();
+            }
+            return next;
+          },
+          markInvalid(sourceKey, errorCode, validatedAt) {
+            const next = delegate.markInvalid(sourceKey, errorCode, validatedAt);
+            if (next) {
+              recordMap.set(next.sourceKey, { ...next });
+              void schedulePersist();
+            }
+            return next;
+          },
+          remove(sourceKey) {
+            const removed = delegate.remove(sourceKey);
+            if (removed) {
+              recordMap.delete(String(sourceKey).trim());
+              if (isStorageLike(storage)) {
+                if (recordMap.size === 0 && typeof storage.deleteAsync === "function") {
+                  persistQueue = persistQueue.catch(() => {
+                  }).then(() => storage.deleteAsync(storageKey)).catch(() => false);
+                } else {
+                  void schedulePersist();
+                }
+              }
+            }
+            return removed;
+          },
+          flush() {
+            return persistQueue.catch(() => false);
+          },
+          dump() {
+            return cloneRecords();
+          }
+        };
+      }
+      async function loadPatSessionStore2(options = {}) {
+        const storage = options.storage;
+        if (!isStorageLike(storage)) {
+          return createPatSessionStore2(options);
+        }
+        const storageKey = typeof options.storageKey === "string" && options.storageKey ? options.storageKey : DEFAULT_STORAGE_KEY;
+        const cipherKey = typeof options.cipherKey === "string" && options.cipherKey ? options.cipherKey : DEFAULT_CIPHER_KEY;
+        let initialRecords = [];
+        try {
+          const payload = await storage.getAsync(storageKey);
+          initialRecords = decodePersistedRecords(payload, cipherKey);
+        } catch (_error) {
+          initialRecords = [];
+        }
+        return createPatSessionStore2({
+          ...options,
+          storage,
+          storageKey,
+          cipherKey,
+          initialRecords
+        });
+      }
+      module.exports = {
+        DEFAULT_STORAGE_KEY,
+        DEFAULT_CIPHER_KEY,
+        encodePersistedRecords,
+        decodePersistedRecords,
+        createPatSessionStore: createPatSessionStore2,
+        loadPatSessionStore: loadPatSessionStore2
+      };
+    }
+  });
+
   // src/widget/code.ts
   var { parseUiCommand } = require_parseUiCommand();
   var { UI_COMMAND, UI_EVENT } = require_messages();
   var {
     createOrRefreshEmbedFromUrl
   } = require_createOrRefreshEmbedFromUrl();
+  var {
+    createPatSessionStore,
+    loadPatSessionStore
+  } = require_patSessionStore();
+  var { redactSensitive } = require_redactSensitive();
   var { widget } = figma;
   var { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
+  var AUTH_ERROR_CODES = Object.freeze({
+    MISSING_PAT: "MISSING_PAT",
+    EXPIRED_PAT: "EXPIRED_PAT",
+    CURRENT_PAT: "CURRENT_PAT"
+  });
+  var AUTH_MESSAGES = Object.freeze({
+    [AUTH_ERROR_CODES.MISSING_PAT]: "El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.",
+    [AUTH_ERROR_CODES.EXPIRED_PAT]: "Tu personal access token es invalido o ha expirado.",
+    [AUTH_ERROR_CODES.CURRENT_PAT]: "Tu personal access token no tiene permisos/scope suficiente."
+  });
+  var runtimePatStorePromise = null;
+  function getRuntimePatStore() {
+    if (!runtimePatStorePromise) {
+      runtimePatStorePromise = loadPatSessionStore({
+        storage: figma.clientStorage,
+        cipherKey: "github-preview-widget/phase-7"
+      }).catch(() => createPatSessionStore());
+    }
+    return runtimePatStorePromise;
+  }
   function openWidgetUi() {
     figma.showUI(__html__, {
       width: 420,
-      height: 220,
+      height: 360,
       title: "GitHub Preview Widget"
     });
+  }
+  function resolveRuntimeError(pipelineError, auth) {
+    const code = typeof (pipelineError == null ? void 0 : pipelineError.code) === "string" && pipelineError.code ? pipelineError.code : "UNKNOWN";
+    const authMessage = AUTH_MESSAGES[code];
+    const message = authMessage || typeof (pipelineError == null ? void 0 : pipelineError.message) === "string" && pipelineError.message || "Could not create preview from this URL.";
+    const details = typeof (pipelineError == null ? void 0 : pipelineError.details) === "string" && pipelineError.details ? redactSensitive(pipelineError.details) : "";
+    const sourceKey = typeof (auth == null ? void 0 : auth.sourceKey) === "string" && auth.sourceKey ? auth.sourceKey : null;
+    return {
+      code,
+      message: redactSensitive(message),
+      details,
+      sourceKey,
+      authRequired: Boolean(authMessage)
+    };
   }
   function GitHubPreviewWidget() {
     var _a;
@@ -2167,12 +2504,14 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
     const [lastUrl, setLastUrl] = useSyncedState("last-url", "");
     const [embedBlock, setEmbedBlock] = useSyncedState("embed-block", null);
     const [embedSnapshot, setEmbedSnapshot] = useSyncedState("embed-snapshot", null);
-    function postRuntimeStatus(level, message, details = "") {
+    const [authContext, setAuthContext] = useSyncedState("auth-context", null);
+    function postRuntimeStatus(level, message, details = "", extras = {}) {
       figma.ui.postMessage({
         type: UI_EVENT.RUNTIME_STATUS,
         level,
         message,
-        details
+        details,
+        ...extras
       });
     }
     usePropertyMenu(
@@ -2190,21 +2529,24 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             type: UI_EVENT.WIDGET_CONTEXT,
             widgetId: "active-widget",
             lastUrl,
-            status
+            status,
+            authContext
           });
         }
       }
     );
     useEffect(() => {
       const runPreviewPipeline = async (url, trigger) => {
-        var _a2, _b, _c, _d, _e;
+        var _a2, _b;
         setStatus("Syncing...");
         postRuntimeStatus("loading", "Syncing...");
         figma.notify("Syncing...");
+        const patStore = await getRuntimePatStore();
         const pipeline = await createOrRefreshEmbedFromUrl({
           url,
           currentEmbedBlock: embedBlock,
-          currentSnapshot: embedSnapshot
+          currentSnapshot: embedSnapshot,
+          patStore
         });
         if (!pipeline.ok) {
           if ((_a2 = pipeline.value) == null ? void 0 : _a2.embedBlock) {
@@ -2213,16 +2555,26 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           if ((_b = pipeline.value) == null ? void 0 : _b.snapshot) {
             setEmbedSnapshot(pipeline.value.snapshot);
           }
-          const errorMessage = ((_c = pipeline.error) == null ? void 0 : _c.message) || "Could not create preview from this URL.";
-          const errorDetails = ((_d = pipeline.error) == null ? void 0 : _d.details) || "";
-          setStatus(`Sync error: ${((_e = pipeline.error) == null ? void 0 : _e.code) || "UNKNOWN"}`);
-          postRuntimeStatus("error", errorMessage, errorDetails);
-          figma.notify(errorMessage, { error: true });
+          const runtimeError = resolveRuntimeError(pipeline.error, pipeline.auth);
+          const nextAuthContext = runtimeError.authRequired && runtimeError.sourceKey ? {
+            sourceKey: runtimeError.sourceKey,
+            code: runtimeError.code,
+            url
+          } : null;
+          setAuthContext(nextAuthContext);
+          setStatus(`Sync error: ${runtimeError.code}`);
+          postRuntimeStatus("error", runtimeError.message, runtimeError.details, {
+            code: runtimeError.code,
+            sourceKey: runtimeError.sourceKey,
+            authRequired: runtimeError.authRequired
+          });
+          figma.notify(runtimeError.message, { error: true });
           return;
         }
         setLastUrl(url);
         setEmbedBlock(pipeline.value.embedBlock);
         setEmbedSnapshot(pipeline.value.snapshot);
+        setAuthContext(null);
         setStatus(`Preview ready (${trigger})`);
         postRuntimeStatus("success", "Preview created.");
         figma.notify("Preview created.");
@@ -2249,6 +2601,50 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             return;
           }
           void runPreviewPipeline(refreshUrl, "refresh");
+          return;
+        }
+        if (command.type === UI_COMMAND.SUBMIT_PAT) {
+          void (async () => {
+            const patStore = await getRuntimePatStore();
+            patStore.set(command.sourceKey, command.token);
+            await patStore.flush();
+            const retryUrl = (authContext && typeof authContext === "object" && authContext.sourceKey === command.sourceKey && typeof authContext.url === "string" ? authContext.url : "") || lastUrl;
+            if (!retryUrl) {
+              setStatus("PAT saved, waiting for URL");
+              postRuntimeStatus(
+                "success",
+                "PAT guardado para este fichero.",
+                "",
+                {
+                  sourceKey: command.sourceKey
+                }
+              );
+              figma.notify("PAT guardado para este fichero.");
+              return;
+            }
+            setStatus("PAT actualizado. Reintentando...");
+            postRuntimeStatus("loading", "Reintentando con PAT actualizado...", "", {
+              sourceKey: command.sourceKey
+            });
+            figma.notify("Reintentando con PAT actualizado...");
+            await runPreviewPipeline(retryUrl, "pat-retry");
+          })();
+          return;
+        }
+        if (command.type === UI_COMMAND.FORGET_PAT) {
+          void (async () => {
+            const patStore = await getRuntimePatStore();
+            patStore.remove(command.sourceKey);
+            await patStore.flush();
+            if (authContext && typeof authContext === "object" && authContext.sourceKey === command.sourceKey) {
+              setAuthContext(null);
+            }
+            setStatus("PAT olvidado para este fichero");
+            postRuntimeStatus("success", "PAT olvidado para este fichero.", "", {
+              sourceKey: command.sourceKey
+            });
+            figma.notify("PAT olvidado para este fichero.");
+          })();
         }
       };
       return () => {

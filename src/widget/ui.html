@@ -49,6 +49,11 @@
         color: #111827;
       }
 
+      .danger {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
       .status {
         font-size: 11px;
         color: #0f172a;
@@ -67,26 +72,89 @@
         color: #7c2d12;
         word-break: break-word;
       }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .auth-panel {
+        display: none;
+        border: 1px solid #fca5a5;
+        border-radius: 8px;
+        background: #fff1f2;
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .auth-panel[data-open="true"] {
+        display: grid;
+      }
+
+      .auth-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #9f1239;
+      }
+
+      .auth-copy {
+        font-size: 11px;
+        color: #7f1d1d;
+      }
+
+      .auth-meta {
+        font-size: 10px;
+        color: #9a3412;
+        word-break: break-word;
+      }
     </style>
   </head>
   <body>
     <form class="root" id="url-form">
       <label class="label" for="url-input">GitHub file URL</label>
       <input id="url-input" placeholder="https://github.com/org/repo/blob/main/README.md" required />
-      <button type="submit">Create preview</button>
-      <button class="secondary" id="refresh-button" type="button">Refresh preview</button>
+      <div class="actions">
+        <button type="submit">Create preview</button>
+        <button class="secondary" id="refresh-button" type="button">Refresh preview</button>
+      </div>
       <div class="status" id="status-line">Ready</div>
       <div class="details" id="details-line"></div>
+      <div class="auth-panel" id="auth-panel" data-open="false">
+        <div class="auth-title">Private file requires PAT</div>
+        <div class="auth-copy" id="auth-copy"></div>
+        <div class="auth-meta" id="auth-meta"></div>
+        <label class="label" for="pat-input">Personal access token</label>
+        <input id="pat-input" type="password" placeholder="ghp_xxx or github_pat_xxx" />
+        <div class="actions">
+          <button class="secondary" id="save-pat-button" type="button">Guardar PAT y reintentar</button>
+          <button class="danger" id="forget-pat-button" type="button">Olvidar PAT fichero</button>
+        </div>
+      </div>
     </form>
 
     <script>
       const form = document.getElementById("url-form");
       const input = document.getElementById("url-input");
+      const patInput = document.getElementById("pat-input");
       const submitButton = form.querySelector("button[type='submit']");
       const refreshButton = document.getElementById("refresh-button");
+      const savePatButton = document.getElementById("save-pat-button");
+      const forgetPatButton = document.getElementById("forget-pat-button");
       const statusLine = document.getElementById("status-line");
       const detailsLine = document.getElementById("details-line");
+      const authPanel = document.getElementById("auth-panel");
+      const authCopy = document.getElementById("auth-copy");
+      const authMeta = document.getElementById("auth-meta");
       let activeWidgetId = "active-widget";
+      let activeAuthContext = null;
+
+      const AUTH_MESSAGES = {
+        MISSING_PAT:
+          "El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.",
+        EXPIRED_PAT: "Tu personal access token es invalido o ha expirado.",
+        CURRENT_PAT: "Tu personal access token no tiene permisos/scope suficiente.",
+      };
 
       function setStatus(level, message, details = "") {
         statusLine.textContent = message || "Ready";
@@ -96,6 +164,25 @@
         const isLoading = level === "loading";
         submitButton.disabled = isLoading;
         refreshButton.disabled = isLoading;
+      }
+
+      function setAuthPanel(open, payload = null) {
+        if (!open || !payload || typeof payload.sourceKey !== "string") {
+          activeAuthContext = null;
+          authPanel.dataset.open = "false";
+          authCopy.textContent = "";
+          authMeta.textContent = "";
+          patInput.value = "";
+          savePatButton.disabled = false;
+          forgetPatButton.disabled = false;
+          return;
+        }
+
+        activeAuthContext = payload;
+        authPanel.dataset.open = "true";
+        authCopy.textContent =
+          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;
+        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;
       }
 
       form.addEventListener("submit", (event) => {
@@ -126,6 +213,48 @@
         );
       });
 
+      savePatButton.addEventListener("click", () => {
+        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== "string") {
+          setStatus("error", "No hay sourceKey para guardar PAT.");
+          return;
+        }
+
+        const token = patInput.value.trim();
+        if (!token) {
+          setStatus("error", "Introduce un PAT valido para continuar.");
+          return;
+        }
+
+        setStatus("loading", "Reintentando con PAT...");
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "submit-pat",
+              sourceKey: activeAuthContext.sourceKey,
+              token,
+            },
+          },
+          "*"
+        );
+      });
+
+      forgetPatButton.addEventListener("click", () => {
+        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== "string") {
+          setStatus("error", "No hay sourceKey para olvidar PAT.");
+          return;
+        }
+
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "forget-pat",
+              sourceKey: activeAuthContext.sourceKey,
+            },
+          },
+          "*"
+        );
+      });
+
       window.onmessage = (event) => {
         const payload = event.data && event.data.pluginMessage;
         if (!payload || typeof payload.type !== "string") {
@@ -144,11 +273,22 @@
           if (typeof payload.status === "string" && payload.status.length > 0) {
             setStatus("", payload.status);
           }
+
+          if (payload.authContext && typeof payload.authContext === "object") {
+            setAuthPanel(true, payload.authContext);
+          } else {
+            setAuthPanel(false);
+          }
           return;
         }
 
         if (payload.type === "runtime-status") {
           setStatus(payload.level, payload.message, payload.details);
+          if (payload.authRequired && typeof payload.sourceKey === "string") {
+            setAuthPanel(true, payload);
+          } else if (payload.level === "success") {
+            setAuthPanel(false);
+          }
         }
       };
     </script>
