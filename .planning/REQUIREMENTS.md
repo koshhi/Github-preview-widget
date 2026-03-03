@@ -10,12 +10,12 @@
 
 - [x] **WDG-01**: Usuario puede cargar el widget en Figma Dev Mode desde un `manifest.json` válido sin errores de inicialización.
 - [x] **WDG-02**: Usuario puede abrir la UI del widget y pegar una URL de fichero GitHub para iniciar la creación del embed.
-- [ ] **WDG-03**: Widget crea en canvas una instancia embebida con estructura visual limpia y metadatos mínimos (`sourceKey`, `lastSync`, `syncState`).
+- [x] **WDG-03**: Widget crea en canvas una instancia embebida con estructura visual limpia y metadatos mínimos (`sourceKey`, `lastSync`, `syncState`).
 
 ### Core Integration
 
-- [ ] **INT-04**: Al confirmar una URL válida, el widget conecta intake + lectura GitHub + render + composición end-to-end usando el core de v1.0.
-- [ ] **INT-05**: Markdown y Mermaid se renderizan correctamente dentro de la superficie del widget con fallback controlado.
+- [x] **INT-04**: Al confirmar una URL válida, el widget conecta intake + lectura GitHub + render + composición end-to-end usando el core de v1.0.
+- [x] **INT-05**: Markdown y Mermaid se renderizan correctamente dentro de la superficie del widget con fallback controlado.
 
 ### Private Access & Security
 
@@ -57,9 +57,9 @@
 |-------------|-------|--------|
 | WDG-01 | Phase 5 | Complete |
 | WDG-02 | Phase 5 | Complete |
-| WDG-03 | Phase 6 | Planned |
-| INT-04 | Phase 6 | Planned |
-| INT-05 | Phase 6 | Planned |
+| WDG-03 | Phase 6 | Complete |
+| INT-04 | Phase 6 | Complete |
+| INT-05 | Phase 6 | Complete |
 | SEC-01 | Phase 7 | Planned |
 | SEC-02 | Phase 7 | Planned |
 | SEC-03 | Phase 7 | Planned |
@@ -76,4 +76,4 @@
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-03 after phase 5 execution*
+*Last updated: 2026-03-03 after phase 6 execution*
