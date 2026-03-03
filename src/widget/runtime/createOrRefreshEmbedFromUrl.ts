@@ -8,6 +8,9 @@ const {
   buildWidgetSnapshot,
   mergeWidgetSnapshot,
 } = require("./persistWidgetSnapshot.ts");
+const {
+  normalizeRenderForWidget,
+} = require("./normalizeRenderForWidget.ts");
 
 function resolveNow(inputNow) {
   if (typeof inputNow === "string" && inputNow) {
@@ -223,11 +226,12 @@ async function createOrRefreshEmbedFromUrl(input = {}, deps = {}) {
   const normalizePreview =
     typeof deps.normalizePreview === "function"
       ? deps.normalizePreview
-      : (value) => value;
+      : normalizeRenderForWidget;
 
   const normalizedPreview = normalizePreview(renderResult.value, {
     url,
     source: readResult.value.source,
+    targetFirstPreviewMs: 2000,
   });
 
   const preview = normalizedPreview?.preview || normalizedPreview;
