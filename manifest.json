@@ -1,0 +1,17 @@
+{
+  "name": "GitHub Preview Widget",
+  "id": "1459004869182062403",
+  "api": "1.0.0",
+  "widgetApi": "1.0.0",
+  "editorType": ["figma"],
+  "containsWidget": true,
+  "main": "src/widget/code.js",
+  "ui": "src/widget/ui.html",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://api.github.com",
+      "https://github.com",
+      "https://raw.githubusercontent.com"
+    ]
+  }
+}
