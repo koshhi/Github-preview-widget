@@ -19,9 +19,9 @@
 
 ### Private Access & Security
 
-- [ ] **SEC-01**: Si el fichero es privado, el widget muestra advertencia y permite introducir PAT por fichero sin romper el flujo.
-- [ ] **SEC-02**: El widget muestra mensajes claros para PAT ausente, PAT expirado/inválido y PAT sin permisos suficientes.
-- [ ] **SEC-03**: El PAT nunca se serializa en estado sincronizado del widget ni en contenido de canvas; solo en almacenamiento local de sesión/configuración.
+- [x] **SEC-01**: Si el fichero es privado, el widget muestra advertencia y permite introducir PAT por fichero sin romper el flujo.
+- [x] **SEC-02**: El widget muestra mensajes claros para PAT ausente, PAT expirado/inválido y PAT sin permisos suficientes.
+- [x] **SEC-03**: El PAT nunca se serializa en estado sincronizado del widget ni en contenido de canvas; solo en almacenamiento local de sesión/configuración.
 
 ### Sync in Widget
 
@@ -60,9 +60,9 @@
 | WDG-03 | Phase 6 | Complete |
 | INT-04 | Phase 6 | Complete |
 | INT-05 | Phase 6 | Complete |
-| SEC-01 | Phase 7 | Planned |
-| SEC-02 | Phase 7 | Planned |
-| SEC-03 | Phase 7 | Planned |
+| SEC-01 | Phase 7 | Complete |
+| SEC-02 | Phase 7 | Complete |
+| SEC-03 | Phase 7 | Complete |
 | SNC-07 | Phase 8 | Planned |
 | SNC-08 | Phase 8 | Planned |
 | SNC-09 | Phase 8 | Planned |
@@ -76,4 +76,4 @@
 - Duplicate mapping: 0
 
 ---
-*Last updated: 2026-03-03 after phase 6 execution*
+*Last updated: 2026-03-03 after phase 7 execution*
