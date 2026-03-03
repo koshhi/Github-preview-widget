@@ -17,10 +17,10 @@ Implemented in this repository:
 - [x] Manual and auto sync with in-place block updates
 
 Current repo scope:
-- Core engine modules and tests (`src/core/*`)
-- No final Figma plugin runtime packaging here (`manifest`, UI/main thread wiring are not included in this repository snapshot)
+- Core engine modules (`src/core/*`) and widget runtime (`src/widget/*`)
+- Figma development manifest + local widget build/check scripts
 
-ES: El repositorio actual contiene el motor core y tests; no incluye el empaquetado final del runtime completo del plugin de Figma.
+ES: El repositorio incluye motor core + runtime real de widget para pruebas en Figma desde `manifest.json`.
 
 ---
 
@@ -101,9 +101,42 @@ npm run typecheck
 Notes:
 - Tests use `node:test`
 - `typecheck` uses `scripts/typecheck.cjs` (syntax validation over `.ts` files)
-- There is currently no build/package script for full Figma plugin runtime in this repo
+- Widget runtime build/check scripts are available: `npm run widget:build`, `npm run widget:check`
 
 ES: Para iterar localmente, basta con `npm test` y `npm run typecheck`.
+
+---
+
+## Run Widget In Figma (Phase 8)
+
+1. Build and validate widget bundle:
+
+```bash
+npm run widget:build
+npm run widget:check
+```
+
+2. Open Figma Desktop:
+- `Plugins -> Development -> Import plugin from manifest...`
+- Select this repository `manifest.json`
+
+3. Run the widget and test core flows:
+- Public URL: paste valid GitHub file URL -> `Create preview`
+- Manual refresh: use `Refresh preview` button and property menu action
+- Private URL: verify PAT prompt, submit PAT, retry success, and forget PAT flow
+
+4. Validate auto-refresh behavior:
+- Reopen/re-enter widget runtime and confirm eligible instance auto-refresh
+- Confirm cooldown prevents immediate repeated auto-sync loops
+
+5. Validate sync state visibility:
+- `idle/syncing/success/error` visible in embed/UI
+- Last result message/detail available without losing previous content on error
+
+Full reproducible checklist:
+- [`.planning/phases/08-sync-uat-docs/08-UAT.md`](./.planning/phases/08-sync-uat-docs/08-UAT.md)
+
+ES: Esta sección define el flujo real de prueba en Figma para cierre de fase 8.
 
 ---
 
@@ -256,6 +289,7 @@ ES: La cobertura está organizada por dominio para aislar regresiones.
 
 - Milestones ledger: [`.planning/MILESTONES.md`](./.planning/MILESTONES.md)
 - Current archived milestone: [`.planning/milestones/v1.0-ROADMAP.md`](./.planning/milestones/v1.0-ROADMAP.md)
+- Phase 8 UAT checklist: [`.planning/phases/08-sync-uat-docs/08-UAT.md`](./.planning/phases/08-sync-uat-docs/08-UAT.md)
 
 Next concrete goals:
 1. OAuth option for private repository access

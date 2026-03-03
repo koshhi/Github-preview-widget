@@ -15,8 +15,8 @@ Plugin orientado a embebidos de ficheros de GitHub en contexto de diseño. Su ob
   - Render de código/texto/Markdown/Mermaid
   - Refresh manual/automático in-place con estado visible
 - Alcance actual:
-  - Motor core y tests
-  - No incluye en este snapshot el wiring final de runtime/plugin Figma (manifest/UI/main thread completos)
+  - Motor core y runtime real de widget (`src/widget/*`)
+  - Manifest de desarrollo Figma + scripts locales de build/check
 
 ## Arquitectura resumida
 
@@ -52,6 +52,36 @@ npm run typecheck
 Notas:
 - `npm test` usa `node:test`.
 - `npm run typecheck` ejecuta `scripts/typecheck.cjs` para validación sintáctica de `.ts`.
+- `npm run widget:build` y `npm run widget:check` validan el runtime del widget para Figma.
+
+## Probar el widget en Figma (Fase 8)
+
+1. Compilar y validar bundle del widget:
+
+```bash
+npm run widget:build
+npm run widget:check
+```
+
+2. En Figma Desktop:
+- `Plugins -> Development -> Import plugin from manifest...`
+- Seleccionar `manifest.json` de este repo.
+
+3. Validar flujo público/privado:
+- URL pública válida -> `Create preview`.
+- Refresh manual desde botón y property menu.
+- URL privada -> prompt PAT -> guardar PAT -> reintento -> éxito.
+
+4. Validar auto-refresh:
+- Reabrir/reanudar runtime y comprobar auto-refresh en instancias elegibles.
+- Confirmar cooldown por instancia (sin ráfagas).
+
+5. Validar estado sync:
+- Estados `idle/syncing/success/error` visibles.
+- Último resultado y detalle disponibles sin perder contenido en error.
+
+Checklist UAT reproducible:
+- [`.planning/phases/08-sync-uat-docs/08-UAT.md`](./.planning/phases/08-sync-uat-docs/08-UAT.md)
 
 ## Snippets clave
 
@@ -107,6 +137,7 @@ Suites por dominio en `src/core/*/__tests__`:
 
 - Milestones: [`.planning/MILESTONES.md`](./.planning/MILESTONES.md)
 - Archivo de v1.0: [`.planning/milestones/v1.0-ROADMAP.md`](./.planning/milestones/v1.0-ROADMAP.md)
+- UAT fase 8: [`.planning/phases/08-sync-uat-docs/08-UAT.md`](./.planning/phases/08-sync-uat-docs/08-UAT.md)
 
 Objetivos siguientes:
 1. OAuth opcional
