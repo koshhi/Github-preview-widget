@@ -1,6 +1,24 @@
-const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .danger {\n        background: #fee2e2;\n        color: #991b1b;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .status.success {\n        color: #166534;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n        display: none;\n      }\n\n      .details[data-open=\"true\"] {\n        display: block;\n      }\n\n      .actions {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 8px;\n      }\n\n      .auth-panel {\n        display: none;\n        border: 1px solid #fca5a5;\n        border-radius: 8px;\n        background: #fff1f2;\n        padding: 10px;\n        gap: 8px;\n      }\n\n      .auth-panel[data-open=\"true\"] {\n        display: grid;\n      }\n\n      .auth-title {\n        font-size: 11px;\n        font-weight: 700;\n        color: #9f1239;\n      }\n\n      .auth-copy {\n        font-size: 11px;\n        color: #7f1d1d;\n      }\n\n      .auth-meta {\n        font-size: 10px;\n        color: #9a3412;\n        word-break: break-word;\n      }\n\n      .link-button {\n        border: 0;\n        background: transparent;\n        padding: 0;\n        font-size: 11px;\n        text-decoration: underline;\n        color: #0f172a;\n        cursor: pointer;\n        text-align: left;\n      }\n\n      .result-meta {\n        font-size: 10px;\n        color: #475569;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <div class=\"actions\">\n        <button type=\"submit\">Create preview</button>\n        <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      </div>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"result-meta\" id=\"result-line\">State: idle</div>\n      <button class=\"link-button\" id=\"toggle-details-button\" type=\"button\">Show details</button>\n      <div class=\"details\" id=\"details-line\" data-open=\"false\"></div>\n      <div class=\"auth-panel\" id=\"auth-panel\" data-open=\"false\">\n        <div class=\"auth-title\">Private file requires PAT</div>\n        <div class=\"auth-copy\" id=\"auth-copy\"></div>\n        <div class=\"auth-meta\" id=\"auth-meta\"></div>\n        <label class=\"label\" for=\"pat-input\">Personal access token</label>\n        <input id=\"pat-input\" type=\"password\" placeholder=\"ghp_xxx or github_pat_xxx\" />\n        <div class=\"actions\">\n          <button class=\"secondary\" id=\"save-pat-button\" type=\"button\">Guardar PAT y reintentar</button>\n          <button class=\"danger\" id=\"forget-pat-button\" type=\"button\">Olvidar PAT fichero</button>\n        </div>\n      </div>\n    </form>\n\n    <script>\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const patInput = document.getElementById(\"pat-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const savePatButton = document.getElementById(\"save-pat-button\");\n      const forgetPatButton = document.getElementById(\"forget-pat-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const resultLine = document.getElementById(\"result-line\");\n      const toggleDetailsButton = document.getElementById(\"toggle-details-button\");\n      const detailsLine = document.getElementById(\"details-line\");\n      const authPanel = document.getElementById(\"auth-panel\");\n      const authCopy = document.getElementById(\"auth-copy\");\n      const authMeta = document.getElementById(\"auth-meta\");\n      let activeWidgetId = \"active-widget\";\n      let activeAuthContext = null;\n      let detailsOpen = false;\n\n      const AUTH_MESSAGES = {\n        MISSING_PAT:\n          \"El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.\",\n        EXPIRED_PAT: \"Tu personal access token es invalido o ha expirado.\",\n        CURRENT_PAT: \"Tu personal access token no tiene permisos/scope suficiente.\",\n      };\n\n      function updateDetailsVisibility() {\n        detailsLine.dataset.open = detailsOpen ? \"true\" : \"false\";\n        toggleDetailsButton.textContent = detailsOpen ? \"Hide details\" : \"Show details\";\n      }\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n        if (!details) {\n          detailsOpen = false;\n        }\n        updateDetailsVisibility();\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      function setLastResult(lastResult, syncState) {\n        const safe = lastResult && typeof lastResult === \"object\" ? lastResult : {};\n        const status = safe.status || syncState || \"idle\";\n        const mode = safe.mode || \"manual\";\n        const message = safe.message ? ` · ${safe.message}` : \"\";\n        resultLine.textContent = `State: ${status} (${mode})${message}`;\n      }\n\n      function setAuthPanel(open, payload = null) {\n        if (!open || !payload || typeof payload.sourceKey !== \"string\") {\n          activeAuthContext = null;\n          authPanel.dataset.open = \"false\";\n          authCopy.textContent = \"\";\n          authMeta.textContent = \"\";\n          patInput.value = \"\";\n          savePatButton.disabled = false;\n          forgetPatButton.disabled = false;\n          return;\n        }\n\n        activeAuthContext = payload;\n        authPanel.dataset.open = \"true\";\n        authCopy.textContent =\n          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;\n        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      toggleDetailsButton.addEventListener(\"click\", () => {\n        detailsOpen = !detailsOpen;\n        updateDetailsVisibility();\n      });\n\n      savePatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para guardar PAT.\");\n          return;\n        }\n\n        const token = patInput.value.trim();\n        if (!token) {\n          setStatus(\"error\", \"Introduce un PAT valido para continuar.\");\n          return;\n        }\n\n        setStatus(\"loading\", \"Reintentando con PAT...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"submit-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n              token,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      forgetPatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para olvidar PAT.\");\n          return;\n        }\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"forget-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n          setLastResult(payload.lastResult, payload.syncState);\n\n          if (payload.authContext && typeof payload.authContext === \"object\") {\n            setAuthPanel(true, payload.authContext);\n          } else {\n            setAuthPanel(false);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n          setLastResult(payload.lastResult, payload.syncState);\n          if (payload.authRequired && typeof payload.sourceKey === \"string\") {\n            setAuthPanel(true, payload);\n          } else if (payload.level === \"success\") {\n            setAuthPanel(false);\n          }\n        }\n      };\n\n      updateDetailsVisibility();\n    </script>\n  </body>\n</html>\n";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __commonJS = (cb, mod) => function __require() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
@@ -356,12 +374,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         }
         return {
           ok: true,
-          value: {
-            ...parsedUrl,
+          value: __spreadProps(__spreadValues({}, parsedUrl), {
             extension: kindResult.value.extension,
             fileKind: kindResult.value.fileKind,
             canonicalBlobUrl: `https://github.com/${owner}/${repo}/blob/${encodeURIComponent(ref)}/${path}`
-          }
+          })
         };
       }
       module.exports = {
@@ -626,8 +643,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         const model = (input == null ? void 0 : input.kind) === EMBED_BLOCK_KIND ? input : createEmbedBlockModel(input, options);
         const ownerRepo = `${model.source.owner}/${model.source.repo}`;
         const statusLabel = getStatusLabel(model.sync.status);
-        return {
-          ...model,
+        return __spreadProps(__spreadValues({}, model), {
           sections: {
             header: {
               ownerRepo,
@@ -657,7 +673,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
               updatedAt: model.sync.lastUpdatedAt
             }
           }
-        };
+        });
       }
       module.exports = {
         composeEmbedBlock
@@ -767,14 +783,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           value: {
             source,
             metadata,
-            embedBlock: {
-              ...block,
-              metadata: {
-                ...block.metadata,
-                ...metadata,
+            embedBlock: __spreadProps(__spreadValues({}, block), {
+              metadata: __spreadProps(__spreadValues(__spreadValues({}, block.metadata), metadata), {
                 sourceUrl: url
-              }
-            }
+              })
+            })
           }
         };
       }
@@ -826,7 +839,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       }
       function cloneRecord(record) {
         if (!record) return null;
-        return { ...record };
+        return __spreadValues({}, record);
       }
       function createPatStore(initialRecords = []) {
         const records = /* @__PURE__ */ new Map();
@@ -867,12 +880,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             const key = sourceKey.trim();
             const existing = records.get(key);
             if (!existing) return null;
-            const next = {
-              ...existing,
+            const next = __spreadProps(__spreadValues({}, existing), {
               status: PAT_STATUS.VALID,
               lastValidatedAt: validatedAt,
               lastErrorCode: void 0
-            };
+            });
             records.set(key, next);
             return cloneRecord(next);
           },
@@ -882,12 +894,11 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
             const key = sourceKey.trim();
             const existing = records.get(key);
             if (!existing) return null;
-            const next = {
-              ...existing,
+            const next = __spreadProps(__spreadValues({}, existing), {
               status: PAT_STATUS.INVALID,
               lastValidatedAt: validatedAt,
               lastErrorCode: errorCode
-            };
+            });
             records.set(key, next);
             return cloneRecord(next);
           },
@@ -1241,7 +1252,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         }
         try {
           JSON.parse(trimmed);
-        } catch {
+        } catch (e) {
           return { isMinified: false, reason: "invalid_json" };
         }
         const hasNewLine = /[\r\n]/.test(trimmed);
@@ -1322,7 +1333,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           if (minified.isMinified) {
             try {
               renderContent = JSON.stringify(JSON.parse(content), null, 2);
-            } catch {
+            } catch (e) {
               warnings.push("JSON inv\xE1lido. Se muestra contenido como texto plano.");
               kind = RENDER_KIND.TEXT;
             }
@@ -1629,20 +1640,17 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         if (cached) {
           return {
             ok: true,
-            value: {
-              ...cached,
-              metrics: {
-                ...cached.metrics,
+            value: __spreadProps(__spreadValues({}, cached), {
+              metrics: __spreadProps(__spreadValues({}, cached.metrics), {
                 cacheHit: true,
                 firstPreviewMs: 0
-              }
-            }
+              })
+            })
           };
         }
-        const policy = resolvePerformancePolicy({
-          inputBytes,
-          ...options.policy
-        });
+        const policy = resolvePerformancePolicy(__spreadValues({
+          inputBytes
+        }, options.policy));
         const warnings = [];
         const contentToRender = policy.shouldTruncate ? truncateToBytes(content, policy.previewBytes) : content;
         if (policy.shouldTruncate) {
@@ -1690,22 +1698,19 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         var _a;
         const nowIso = typeof options.now === "string" && options.now ? options.now : (/* @__PURE__ */ new Date()).toISOString();
         const base = (block == null ? void 0 : block.kind) === EMBED_BLOCK_KIND ? block : createEmbedBlockModel(block || {}, { now: nowIso });
-        const nextModel = {
-          ...base,
+        const nextModel = __spreadProps(__spreadValues({}, base), {
           sourceKey: typeof patch.sourceKey === "string" && patch.sourceKey ? patch.sourceKey : base.sourceKey,
-          source: patch.source ? { ...base.source, ...patch.source } : base.source,
-          preview: patch.preview ? { ...base.preview, ...patch.preview } : base.preview,
-          sync: patch.sync ? { ...base.sync, ...patch.sync } : base.sync,
-          layout: patch.layout ? { ...base.layout, ...patch.layout } : base.layout,
+          source: patch.source ? __spreadValues(__spreadValues({}, base.source), patch.source) : base.source,
+          preview: patch.preview ? __spreadValues(__spreadValues({}, base.preview), patch.preview) : base.preview,
+          sync: patch.sync ? __spreadValues(__spreadValues({}, base.sync), patch.sync) : base.sync,
+          layout: patch.layout ? __spreadValues(__spreadValues({}, base.layout), patch.layout) : base.layout,
           updatedAt: nowIso,
-          metadata: {
-            ...base.metadata,
+          metadata: __spreadProps(__spreadValues({}, base.metadata), {
             updatedInPlace: true
-          }
-        };
+          })
+        });
         const composed = composeEmbedBlock(nextModel, { now: nowIso });
-        return {
-          ...composed,
+        return __spreadProps(__spreadValues({}, composed), {
           id: base.id,
           kind: base.kind,
           sourceKey: nextModel.sourceKey,
@@ -1715,11 +1720,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           layout: nextModel.layout,
           createdAt: base.createdAt,
           updatedAt: nowIso,
-          metadata: {
-            ...nextModel.metadata,
+          metadata: __spreadProps(__spreadValues({}, nextModel.metadata), {
             version: ((_a = base.metadata) == null ? void 0 : _a.version) || 1
-          }
-        };
+          })
+        });
       }
       module.exports = {
         updateEmbedBlockInPlace
@@ -1745,45 +1749,41 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         const nowIso = resolveNow(options);
         const mode = normalizeMode(event.mode || currentSync.mode);
         if (event.type === "start") {
-          return {
-            ...currentSync,
+          return __spreadProps(__spreadValues({}, currentSync), {
             status: SYNC_STATUS.SYNCING,
             mode,
             message: "Syncing...",
             details: "",
             lastUpdatedAt: nowIso
-          };
+          });
         }
         if (event.type === "success") {
           const syncedAt = typeof event.syncedAt === "string" && event.syncedAt ? event.syncedAt : nowIso;
-          return {
-            ...currentSync,
+          return __spreadProps(__spreadValues({}, currentSync), {
             status: SYNC_STATUS.SUCCESS,
             mode,
             lastSyncAt: syncedAt,
             message: typeof event.message === "string" && event.message ? event.message : mode === SYNC_MODE2.AUTO ? "Auto-sync completado" : "Sincronizaci\xF3n completada",
             details: "",
             lastUpdatedAt: nowIso
-          };
+          });
         }
         if (event.type === "error") {
-          return {
-            ...currentSync,
+          return __spreadProps(__spreadValues({}, currentSync), {
             status: SYNC_STATUS.ERROR,
             mode,
             message: typeof event.message === "string" && event.message ? event.message : "Sync error",
             details: typeof event.details === "string" && event.details ? event.details : "No se pudo sincronizar el contenido remoto.",
             lastUpdatedAt: nowIso
-          };
+          });
         }
-        return {
-          ...currentSync,
+        return __spreadProps(__spreadValues({}, currentSync), {
           status: SYNC_STATUS.IDLE,
           mode,
           message: typeof currentSync.message === "string" && currentSync.message ? currentSync.message : "Sin sincronizar",
           details: typeof currentSync.details === "string" ? currentSync.details : "",
           lastUpdatedAt: nowIso
-        };
+        });
       }
       function buildSyncBadge(sync = {}) {
         const status = sync.status || SYNC_STATUS.IDLE;
@@ -1922,19 +1922,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           lastSync: hasField("lastSync") ? patch.lastSync : previous.lastSync || null,
           warnings: Array.isArray(patch.warnings) ? patch.warnings : Array.isArray(previous.warnings) ? previous.warnings : [],
           warningCount: typeof patch.warningCount === "number" ? patch.warningCount : Array.isArray(patch.warnings) ? patch.warnings.length : typeof previous.warningCount === "number" ? previous.warningCount : 0,
-          render: {
-            ...previous.render || {},
-            ...patch.render || {}
-          },
-          metrics: {
-            ...previous.metrics || {},
-            ...patch.metrics || {}
-          },
+          render: __spreadValues(__spreadValues({}, previous.render || {}), patch.render || {}),
+          metrics: __spreadValues(__spreadValues({}, previous.metrics || {}), patch.metrics || {}),
           lastResult: buildLastResultSnapshot({
-            lastResult: {
-              ...previous.lastResult || {},
-              ...patch.lastResult || {}
-            },
+            lastResult: __spreadValues(__spreadValues({}, previous.lastResult || {}), patch.lastResult || {}),
             syncState: typeof patch.syncState === "string" && patch.syncState ? patch.syncState : previous.syncState || "idle",
             updatedAt
           }),
@@ -1999,11 +1990,10 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         const dedupedWarnings = normalizeWarningList(warnings);
         const warningDetail = dedupedWarnings.length > 0 ? `${dedupedWarnings[0]}${dedupedWarnings.length > 1 ? ` (+${dedupedWarnings.length - 1} more)` : ""}` : "";
         return {
-          preview: {
-            ...preview,
+          preview: __spreadProps(__spreadValues({}, preview), {
             blocks: normalizedBlocks,
             warnings: dedupedWarnings
-          },
+          }),
           warnings: dedupedWarnings,
           warningDetail,
           policy: {
@@ -2398,7 +2388,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         const delegate = createPatStore(initialRecords);
         let persistQueue = Promise.resolve();
         function cloneRecords() {
-          return Array.from(recordMap.values()).map((entry) => ({ ...entry }));
+          return Array.from(recordMap.values()).map((entry) => __spreadValues({}, entry));
         }
         function schedulePersist() {
           if (!isStorageLike(storage)) {
@@ -2416,7 +2406,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           set(sourceKey, token) {
             const next = delegate.set(sourceKey, token);
             if (next) {
-              recordMap.set(next.sourceKey, { ...next });
+              recordMap.set(next.sourceKey, __spreadValues({}, next));
               void schedulePersist();
             }
             return next;
@@ -2424,7 +2414,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           markValid(sourceKey, validatedAt) {
             const next = delegate.markValid(sourceKey, validatedAt);
             if (next) {
-              recordMap.set(next.sourceKey, { ...next });
+              recordMap.set(next.sourceKey, __spreadValues({}, next));
               void schedulePersist();
             }
             return next;
@@ -2432,7 +2422,7 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
           markInvalid(sourceKey, errorCode, validatedAt) {
             const next = delegate.markInvalid(sourceKey, errorCode, validatedAt);
             if (next) {
-              recordMap.set(next.sourceKey, { ...next });
+              recordMap.set(next.sourceKey, __spreadValues({}, next));
               void schedulePersist();
             }
             return next;
@@ -2474,13 +2464,12 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
         } catch (_error) {
           initialRecords = [];
         }
-        return createPatSessionStore2({
-          ...options,
+        return createPatSessionStore2(__spreadProps(__spreadValues({}, options), {
           storage,
           storageKey,
           cipherKey,
           initialRecords
-        });
+        }));
       }
       module.exports = {
         DEFAULT_STORAGE_KEY,
@@ -2689,13 +2678,12 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       {}
     );
     function postRuntimeStatus(level, message, details = "", extras = {}) {
-      figma.ui.postMessage({
+      figma.ui.postMessage(__spreadValues({
         type: UI_EVENT.RUNTIME_STATUS,
         level,
         message,
-        details,
-        ...extras
-      });
+        details
+      }, extras));
     }
     async function runPreviewPipeline(url, trigger, options = {}) {
       var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
@@ -2810,10 +2798,9 @@ const __html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta chars
       if (!decision.ok) {
         return false;
       }
-      setAutoRefreshMap({
-        ...autoRefreshMap || {},
+      setAutoRefreshMap(__spreadProps(__spreadValues({}, autoRefreshMap || {}), {
         [sourceKey]: decision.nowMs
-      });
+      }));
       void runPreviewPipeline(lastUrl, `auto-${origin}`, {
         mode: SYNC_MODE.AUTO,
         skipManualLock: true,

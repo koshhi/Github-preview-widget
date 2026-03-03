@@ -6,10 +6,7 @@ const esbuild = require("esbuild");
 async function main() {
   const root = process.cwd();
   const entry = resolve(root, "src/widget/code.ts");
-  const uiPath = resolve(root, "src/widget/ui.html");
   const outFile = resolve(root, "src/widget/code.js");
-
-  const uiHtml = readFileSync(uiPath, "utf8");
   mkdirSync(dirname(outFile), { recursive: true });
 
   await esbuild.build({
@@ -18,11 +15,10 @@ async function main() {
     bundle: true,
     format: "iife",
     platform: "browser",
-    target: ["es2019"],
+    // Figma widget runtime rejects some newer syntax (e.g. object spread),
+    // so we transpile to a more conservative target.
+    target: ["es2017"],
     logLevel: "silent",
-    banner: {
-      js: `const __html__ = ${JSON.stringify(uiHtml)};`,
-    },
   });
 
   writeFileSync(outFile, readFileSync(outFile, "utf8"), "utf8");
