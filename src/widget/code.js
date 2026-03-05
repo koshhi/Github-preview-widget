@@ -1,3 +1,4 @@
+const __widget_ui_html__ = "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>GitHub Preview Widget</title>\n    <style>\n      body {\n        margin: 0;\n        font-family: Inter, sans-serif;\n        background: #f7f7f8;\n        color: #1e1e1f;\n      }\n\n      .root {\n        padding: 14px;\n        display: grid;\n        gap: 10px;\n      }\n\n      .label {\n        font-size: 12px;\n        font-weight: 600;\n      }\n\n      input {\n        width: 100%;\n        box-sizing: border-box;\n        padding: 10px;\n        border-radius: 8px;\n        border: 1px solid #d4d4d8;\n        background: #fff;\n        font-size: 12px;\n      }\n\n      button {\n        border: 0;\n        border-radius: 8px;\n        background: #111827;\n        color: #fff;\n        font-size: 12px;\n        font-weight: 600;\n        padding: 10px;\n        cursor: pointer;\n      }\n\n      .secondary {\n        background: #e4e4e7;\n        color: #111827;\n      }\n\n      .danger {\n        background: #fee2e2;\n        color: #991b1b;\n      }\n\n      .status {\n        font-size: 11px;\n        color: #0f172a;\n      }\n\n      .status.error {\n        color: #b91c1c;\n      }\n\n      .status.loading {\n        color: #0c4a6e;\n      }\n\n      .status.success {\n        color: #166534;\n      }\n\n      .details {\n        font-size: 10px;\n        color: #7c2d12;\n        word-break: break-word;\n        display: none;\n      }\n\n      .details[data-open=\"true\"] {\n        display: block;\n      }\n\n      .actions {\n        display: grid;\n        grid-template-columns: 1fr 1fr;\n        gap: 8px;\n      }\n\n      .auth-panel {\n        display: none;\n        border: 1px solid #fca5a5;\n        border-radius: 8px;\n        background: #fff1f2;\n        padding: 10px;\n        gap: 8px;\n      }\n\n      .auth-panel[data-open=\"true\"] {\n        display: grid;\n      }\n\n      .auth-title {\n        font-size: 11px;\n        font-weight: 700;\n        color: #9f1239;\n      }\n\n      .auth-copy {\n        font-size: 11px;\n        color: #7f1d1d;\n      }\n\n      .auth-meta {\n        font-size: 10px;\n        color: #9a3412;\n        word-break: break-word;\n      }\n\n      .link-button {\n        border: 0;\n        background: transparent;\n        padding: 0;\n        font-size: 11px;\n        text-decoration: underline;\n        color: #0f172a;\n        cursor: pointer;\n        text-align: left;\n      }\n\n      .result-meta {\n        font-size: 10px;\n        color: #475569;\n      }\n\n      .progress-line {\n        font-size: 10px;\n        color: #334155;\n      }\n\n      .progress-track {\n        width: 100%;\n        height: 6px;\n        border-radius: 999px;\n        background: #e2e8f0;\n        overflow: hidden;\n      }\n\n      .progress-fill {\n        height: 100%;\n        width: 0%;\n        background: #0f766e;\n        transition: width 160ms linear;\n      }\n\n      .preview-panel {\n        display: grid;\n        gap: 6px;\n      }\n\n      .preview-text {\n        margin: 0;\n        padding: 8px;\n        border: 1px solid #d4d4d8;\n        border-radius: 8px;\n        background: #ffffff;\n        font-size: 10px;\n        color: #0f172a;\n        max-height: 360px;\n        min-height: 180px;\n        overflow: auto;\n        resize: vertical;\n      }\n\n      .preview-empty {\n        color: #64748b;\n        white-space: pre-wrap;\n      }\n\n      .preview-md-heading {\n        margin: 0 0 8px 0;\n        font-size: 13px;\n        font-weight: 700;\n        color: #0f172a;\n      }\n\n      .preview-md-paragraph {\n        margin: 0 0 8px 0;\n        font-size: 11px;\n        line-height: 1.4;\n        white-space: pre-wrap;\n      }\n\n      .preview-md-list {\n        margin: 0 0 8px 16px;\n        padding: 0;\n        font-size: 11px;\n        line-height: 1.4;\n      }\n\n      .preview-md-code {\n        margin: 0 0 8px 0;\n        padding: 8px;\n        border-radius: 6px;\n        border: 1px solid #d4d4d8;\n        background: #f8fafc;\n        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n        font-size: 10px;\n        white-space: pre-wrap;\n      }\n\n      .preview-inline-code {\n        padding: 1px 4px;\n        border-radius: 4px;\n        border: 1px solid #d4d4d8;\n        background: #f1f5f9;\n        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n        font-size: 10px;\n      }\n\n      .preview-md-link {\n        color: #1d4ed8;\n        text-decoration: underline;\n      }\n\n      .preview-md-table-wrap {\n        margin: 0 0 8px 0;\n        overflow-x: auto;\n      }\n\n      .preview-md-table {\n        width: 100%;\n        border-collapse: collapse;\n        font-size: 10px;\n        line-height: 1.4;\n      }\n\n      .preview-md-table th,\n      .preview-md-table td {\n        border: 0.5px solid #cbd5e1;\n        padding: 4px 6px;\n        text-align: left;\n        vertical-align: top;\n      }\n\n      .preview-md-table th {\n        background: #f1f5f9;\n        font-weight: 700;\n      }\n\n      .preview-md-divider {\n        border: 0;\n        border-top: 0.5px solid #cbd5e1;\n        margin: 10px 0;\n      }\n    </style>\n  </head>\n  <body>\n    <form class=\"root\" id=\"url-form\">\n      <label class=\"label\" for=\"url-input\">GitHub file URL</label>\n      <input id=\"url-input\" placeholder=\"https://github.com/org/repo/blob/main/README.md\" required />\n      <div class=\"actions\">\n        <button type=\"submit\">Create preview</button>\n        <button class=\"secondary\" id=\"refresh-button\" type=\"button\">Refresh preview</button>\n      </div>\n      <div class=\"status\" id=\"status-line\">Ready</div>\n      <div class=\"result-meta\" id=\"result-line\">State: idle</div>\n      <div class=\"progress-line\" id=\"progress-line\">Sync progress: 0%</div>\n      <div class=\"progress-track\"><div class=\"progress-fill\" id=\"progress-fill\"></div></div>\n      <div class=\"preview-panel\">\n        <div class=\"label\">Preview</div>\n        <div class=\"preview-text\" id=\"preview-text\"></div>\n      </div>\n      <button class=\"link-button\" id=\"toggle-details-button\" type=\"button\">Show details</button>\n      <div class=\"details\" id=\"details-line\" data-open=\"false\"></div>\n      <div class=\"auth-panel\" id=\"auth-panel\" data-open=\"false\">\n        <div class=\"auth-title\">Private file requires PAT</div>\n        <div class=\"auth-copy\" id=\"auth-copy\"></div>\n        <div class=\"auth-meta\" id=\"auth-meta\"></div>\n        <label class=\"label\" for=\"pat-input\">Personal access token</label>\n        <input id=\"pat-input\" type=\"password\" placeholder=\"ghp_xxx or github_pat_xxx\" />\n        <div class=\"actions\">\n          <button class=\"secondary\" id=\"save-pat-button\" type=\"button\">Guardar PAT y reintentar</button>\n          <button class=\"danger\" id=\"forget-pat-button\" type=\"button\">Olvidar PAT fichero</button>\n        </div>\n      </div>\n    </form>\n\n    <script>\n      parent.postMessage(\n        {\n          pluginMessage: {\n            type: \"ui-ready\",\n          },\n        },\n        \"*\"\n      );\n\n      window.addEventListener(\"beforeunload\", () => {\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"ui-closed\",\n            },\n          },\n          \"*\"\n        );\n      });\n\n      const form = document.getElementById(\"url-form\");\n      const input = document.getElementById(\"url-input\");\n      const patInput = document.getElementById(\"pat-input\");\n      const submitButton = form.querySelector(\"button[type='submit']\");\n      const refreshButton = document.getElementById(\"refresh-button\");\n      const savePatButton = document.getElementById(\"save-pat-button\");\n      const forgetPatButton = document.getElementById(\"forget-pat-button\");\n      const statusLine = document.getElementById(\"status-line\");\n      const resultLine = document.getElementById(\"result-line\");\n      const toggleDetailsButton = document.getElementById(\"toggle-details-button\");\n      const detailsLine = document.getElementById(\"details-line\");\n      const authPanel = document.getElementById(\"auth-panel\");\n      const authCopy = document.getElementById(\"auth-copy\");\n      const authMeta = document.getElementById(\"auth-meta\");\n      const previewText = document.getElementById(\"preview-text\");\n      const progressLine = document.getElementById(\"progress-line\");\n      const progressFill = document.getElementById(\"progress-fill\");\n      let activeWidgetId = \"active-widget\";\n      let activeAuthContext = null;\n      let detailsOpen = false;\n      let syncProgress = 0;\n\n      const AUTH_MESSAGES = {\n        MISSING_PAT:\n          \"El fichero que intentas visualizar es privado. Crea o pega un personal access token para continuar.\",\n        EXPIRED_PAT: \"Tu personal access token es invalido o ha expirado.\",\n        CURRENT_PAT: \"Tu personal access token no tiene permisos/scope suficiente.\",\n      };\n\n      function updateDetailsVisibility() {\n        detailsLine.dataset.open = detailsOpen ? \"true\" : \"false\";\n        toggleDetailsButton.textContent = detailsOpen ? \"Hide details\" : \"Show details\";\n      }\n\n      function setStatus(level, message, details = \"\") {\n        statusLine.textContent = message || \"Ready\";\n        statusLine.className = `status ${level || \"\"}`.trim();\n        detailsLine.textContent = details || \"\";\n        if (!details) {\n          detailsOpen = false;\n        }\n        updateDetailsVisibility();\n\n        const isLoading = level === \"loading\";\n        submitButton.disabled = isLoading;\n        refreshButton.disabled = isLoading;\n      }\n\n      function setLastResult(lastResult, syncState) {\n        const safe = lastResult && typeof lastResult === \"object\" ? lastResult : {};\n        const status = safe.status || syncState || \"idle\";\n        const mode = safe.mode || \"manual\";\n        const message = safe.message ? ` · ${safe.message}` : \"\";\n        resultLine.textContent = `State: ${status} (${mode})${message}`;\n      }\n\n      function setSyncProgress(rawPercent) {\n        const percent = Number.isFinite(Number(rawPercent))\n          ? Math.max(0, Math.min(100, Math.round(Number(rawPercent))))\n          : 0;\n        syncProgress = percent;\n        progressLine.textContent = `Sync progress: ${percent}%`;\n        progressFill.style.width = `${percent}%`;\n      }\n\n      function clearNodeChildren(node) {\n        while (node.firstChild) {\n          node.removeChild(node.firstChild);\n        }\n      }\n\n      function appendPreviewNode(tagName, className, text) {\n        const node = document.createElement(tagName);\n        if (className) node.className = className;\n        node.textContent = typeof text === \"string\" ? text : \"\";\n        return node;\n      }\n\n      function escapeHtml(value) {\n        return String(value || \"\")\n          .replace(/&/g, \"&amp;\")\n          .replace(/</g, \"&lt;\")\n          .replace(/>/g, \"&gt;\")\n          .replace(/\"/g, \"&quot;\")\n          .replace(/'/g, \"&#39;\");\n      }\n\n      function formatInlineMarkdownToHtml(value) {\n        let html = escapeHtml(value);\n        html = html.replace(\n          /\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g,\n          '<a class=\"preview-md-link\" href=\"$2\" target=\"_blank\" rel=\"noreferrer\">$1</a>'\n        );\n        html = html.replace(/`([^`]+)`/g, '<code class=\"preview-inline-code\">$1</code>');\n        html = html.replace(/\\*\\*([^*]+)\\*\\*/g, \"<strong>$1</strong>\");\n        html = html.replace(/__([^_]+)__/g, \"<strong>$1</strong>\");\n        html = html.replace(/(^|[^\\*])\\*([^*\\n]+)\\*/g, \"$1<em>$2</em>\");\n        html = html.replace(/(^|[^_])_([^_\\n]+)_/g, \"$1<em>$2</em>\");\n        html = html.replace(/\\n/g, \"<br/>\");\n        return html;\n      }\n\n      function appendMarkdownNode(tagName, className, text) {\n        const node = document.createElement(tagName);\n        if (className) node.className = className;\n        node.innerHTML = formatInlineMarkdownToHtml(text);\n        return node;\n      }\n\n      function parseMarkdownTableRow(line) {\n        const normalized = String(line || \"\").trim().replace(/^\\|/, \"\").replace(/\\|$/, \"\");\n        return normalized.split(\"|\").map((cell) => cell.trim());\n      }\n\n      function buildTableNode(content) {\n        const rawLines = String(content || \"\")\n          .split(/\\r?\\n/)\n          .map((line) => line.trim())\n          .filter(Boolean);\n        if (rawLines.length < 2) {\n          return appendPreviewNode(\"pre\", \"preview-md-code\", String(content || \"\"));\n        }\n\n        const header = parseMarkdownTableRow(rawLines[0]);\n        const rows = rawLines.slice(2).map(parseMarkdownTableRow);\n        const colCount = Math.max(1, header.length);\n\n        const wrapper = document.createElement(\"div\");\n        wrapper.className = \"preview-md-table-wrap\";\n        const table = document.createElement(\"table\");\n        table.className = \"preview-md-table\";\n        const thead = document.createElement(\"thead\");\n        const headRow = document.createElement(\"tr\");\n        for (let i = 0; i < colCount; i += 1) {\n          const th = document.createElement(\"th\");\n          th.innerHTML = formatInlineMarkdownToHtml(header[i] || \"\");\n          headRow.appendChild(th);\n        }\n        thead.appendChild(headRow);\n        table.appendChild(thead);\n\n        const tbody = document.createElement(\"tbody\");\n        for (const rowCells of rows) {\n          const tr = document.createElement(\"tr\");\n          for (let i = 0; i < colCount; i += 1) {\n            const td = document.createElement(\"td\");\n            td.innerHTML = formatInlineMarkdownToHtml(rowCells[i] || \"\");\n            tr.appendChild(td);\n          }\n          tbody.appendChild(tr);\n        }\n        table.appendChild(tbody);\n        wrapper.appendChild(table);\n        return wrapper;\n      }\n\n      function normalizeListItem(item) {\n        if (item && typeof item === \"object\") {\n          return {\n            content: String(item.content || \"\"),\n            depth: Math.max(1, Number(item.depth || 1)),\n          };\n        }\n        return {\n          content: String(item || \"\"),\n          depth: 1,\n        };\n      }\n\n      function buildNestedListNode(items, ordered) {\n        const listTag = ordered ? \"ol\" : \"ul\";\n        const root = document.createElement(listTag);\n        root.className = \"preview-md-list\";\n        const stack = [{ depth: 1, list: root }];\n\n        for (const rawItem of items) {\n          const current = normalizeListItem(rawItem);\n          let targetDepth = Math.max(1, current.depth);\n\n          while (stack.length > targetDepth) {\n            stack.pop();\n          }\n\n          while (stack.length < targetDepth) {\n            const parent = stack[stack.length - 1].list;\n            let parentLi = parent.lastElementChild;\n            if (!parentLi) {\n              parentLi = document.createElement(\"li\");\n              parent.appendChild(parentLi);\n            }\n\n            const nested = document.createElement(listTag);\n            nested.className = \"preview-md-list\";\n            parentLi.appendChild(nested);\n            stack.push({ depth: stack.length + 1, list: nested });\n          }\n\n          stack[stack.length - 1].list.appendChild(\n            appendMarkdownNode(\"li\", \"\", current.content)\n          );\n        }\n\n        return root;\n      }\n\n      function setPreviewContent(payload) {\n        const summary =\n          typeof payload?.previewSummary === \"string\" ? payload.previewSummary.trim() : \"\";\n        const previewKind =\n          typeof payload?.previewKind === \"string\" ? payload.previewKind : \"text\";\n        const previewBlocks = Array.isArray(payload?.previewBlocks) ? payload.previewBlocks : [];\n\n        clearNodeChildren(previewText);\n\n        if (previewKind === \"markdown\" && previewBlocks.length > 0) {\n          const fragment = document.createDocumentFragment();\n\n          for (const block of previewBlocks) {\n            const type = typeof block?.type === \"string\" ? block.type : \"text\";\n\n            if (type === \"heading\") {\n              fragment.appendChild(\n                appendMarkdownNode(\n                  \"p\",\n                  \"preview-md-heading\",\n                  String(block?.content || \"\")\n                )\n              );\n              continue;\n            }\n\n            if (type === \"paragraph\") {\n              fragment.appendChild(\n                appendMarkdownNode(\n                  \"p\",\n                  \"preview-md-paragraph\",\n                  String(block?.content || \"\")\n                )\n              );\n              continue;\n            }\n\n            if (type === \"list\" && Array.isArray(block?.items)) {\n              fragment.appendChild(buildNestedListNode(block.items, Boolean(block.ordered)));\n              continue;\n            }\n\n            if (type === \"divider\") {\n              const hr = document.createElement(\"hr\");\n              hr.className = \"preview-md-divider\";\n              fragment.appendChild(hr);\n              continue;\n            }\n\n            if (type === \"table\") {\n              fragment.appendChild(buildTableNode(block?.content || \"\"));\n              continue;\n            }\n\n            if (type === \"code\" || type === \"text\" || type === \"mermaid\") {\n              fragment.appendChild(\n                appendPreviewNode(\"pre\", \"preview-md-code\", String(block?.content || \"\"))\n              );\n              continue;\n            }\n\n            fragment.appendChild(\n              appendPreviewNode(\n                \"p\",\n                \"preview-md-paragraph\",\n                String(block?.content || \"\")\n              )\n            );\n          }\n\n          previewText.appendChild(fragment);\n          return;\n        }\n\n        previewText.appendChild(\n          appendPreviewNode(\"pre\", \"preview-empty\", summary || \"No preview yet.\")\n        );\n      }\n\n      function setAuthPanel(open, payload = null) {\n        if (!open || !payload || typeof payload.sourceKey !== \"string\") {\n          activeAuthContext = null;\n          authPanel.dataset.open = \"false\";\n          authCopy.textContent = \"\";\n          authMeta.textContent = \"\";\n          patInput.value = \"\";\n          savePatButton.disabled = false;\n          forgetPatButton.disabled = false;\n          return;\n        }\n\n        activeAuthContext = payload;\n        authPanel.dataset.open = \"true\";\n        authCopy.textContent =\n          payload.message || AUTH_MESSAGES[payload.code] || AUTH_MESSAGES.MISSING_PAT;\n        authMeta.textContent = `sourceKey: ${payload.sourceKey}`;\n      }\n\n      form.addEventListener(\"submit\", (event) => {\n        event.preventDefault();\n        setStatus(\"loading\", \"Syncing...\");\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"create-preview\",\n              url: input.value,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      refreshButton.addEventListener(\"click\", () => {\n        setStatus(\"loading\", \"Syncing...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"refresh-preview\",\n              widgetId: activeWidgetId,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      toggleDetailsButton.addEventListener(\"click\", () => {\n        detailsOpen = !detailsOpen;\n        updateDetailsVisibility();\n      });\n\n      savePatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para guardar PAT.\");\n          return;\n        }\n\n        const token = patInput.value.trim();\n        if (!token) {\n          setStatus(\"error\", \"Introduce un PAT valido para continuar.\");\n          return;\n        }\n\n        setStatus(\"loading\", \"Reintentando con PAT...\");\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"submit-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n              token,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      forgetPatButton.addEventListener(\"click\", () => {\n        if (!activeAuthContext || typeof activeAuthContext.sourceKey !== \"string\") {\n          setStatus(\"error\", \"No hay sourceKey para olvidar PAT.\");\n          return;\n        }\n\n        parent.postMessage(\n          {\n            pluginMessage: {\n              type: \"forget-pat\",\n              sourceKey: activeAuthContext.sourceKey,\n            },\n          },\n          \"*\"\n        );\n      });\n\n      window.onmessage = (event) => {\n        const payload = event.data && event.data.pluginMessage;\n        if (!payload || typeof payload.type !== \"string\") {\n          return;\n        }\n\n        if (payload.type === \"widget-context\") {\n          if (typeof payload.lastUrl === \"string\" && payload.lastUrl.length > 0) {\n            input.value = payload.lastUrl;\n          }\n\n          if (typeof payload.widgetId === \"string\" && payload.widgetId.length > 0) {\n            activeWidgetId = payload.widgetId;\n          }\n\n          if (typeof payload.status === \"string\" && payload.status.length > 0) {\n            setStatus(\"\", payload.status);\n          }\n          setLastResult(payload.lastResult, payload.syncState);\n          setSyncProgress(payload.progressPercent);\n          setPreviewContent(payload);\n\n          if (payload.authContext && typeof payload.authContext === \"object\") {\n            setAuthPanel(true, payload.authContext);\n          } else {\n            setAuthPanel(false);\n          }\n          return;\n        }\n\n        if (payload.type === \"runtime-status\") {\n          setStatus(payload.level, payload.message, payload.details);\n          setLastResult(payload.lastResult, payload.syncState);\n          if (payload.level === \"success\" && payload.progressPercent == null) {\n            setSyncProgress(100);\n          } else if (payload.level === \"error\" && payload.progressPercent == null) {\n            setSyncProgress(100);\n          } else {\n            setSyncProgress(payload.progressPercent);\n          }\n          setPreviewContent(payload);\n          if (payload.authRequired && typeof payload.sourceKey === \"string\") {\n            setAuthPanel(true, payload);\n          } else if (payload.level === \"success\") {\n            setAuthPanel(false);\n          }\n        }\n      };\n\n      setPreviewContent({});\n      updateDetailsVisibility();\n    </script>\n  </body>\n</html>\n";
 (() => {
   var __defProp = Object.defineProperty;
   var __defProps = Object.defineProperties;
@@ -248,24 +249,42 @@
           }
         };
       }
+      function parseHttpsUrl(inputUrl) {
+        const trimmed = String(inputUrl || "").trim();
+        const schemeMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);
+        if (schemeMatch && schemeMatch[1].toLowerCase() !== "https") {
+          return parseError(URL_ERROR_CODES.UNSUPPORTED_ROUTE, "Only HTTPS URLs are supported.");
+        }
+        const match = trimmed.match(/^https:\/\/([^/?#]+)(\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i);
+        if (!match) {
+          return parseError(URL_ERROR_CODES.INVALID_FORMAT, "Invalid URL format.");
+        }
+        const hostname = String(match[1] || "").toLowerCase();
+        const pathname = match[2] && match[2].length > 0 ? match[2] : "/";
+        if (!hostname) {
+          return parseError(URL_ERROR_CODES.INVALID_FORMAT, "Invalid URL host.");
+        }
+        return {
+          ok: true,
+          value: {
+            hostname,
+            pathname
+          }
+        };
+      }
       function parseGithubFileUrl(inputUrl) {
         if (typeof inputUrl !== "string" || inputUrl.trim() === "") {
           return parseError(URL_ERROR_CODES.INVALID_FORMAT, "URL must be a non-empty string.");
         }
-        let parsedUrl;
-        try {
-          parsedUrl = new URL(inputUrl);
-        } catch (error) {
-          return parseError(URL_ERROR_CODES.INVALID_FORMAT, `Invalid URL: ${error.message}`);
+        const parsedUrl = parseHttpsUrl(inputUrl);
+        if (!parsedUrl.ok) {
+          return parsedUrl;
         }
-        if (parsedUrl.protocol !== "https:") {
-          return parseError(URL_ERROR_CODES.UNSUPPORTED_ROUTE, "Only HTTPS URLs are supported.");
+        if (parsedUrl.value.hostname === "github.com") {
+          return parseBlobPath(parsedUrl.value);
         }
-        if (parsedUrl.hostname === "github.com") {
-          return parseBlobPath(parsedUrl);
-        }
-        if (parsedUrl.hostname === "raw.githubusercontent.com") {
-          return parseRawPath(parsedUrl);
+        if (parsedUrl.value.hostname === "raw.githubusercontent.com") {
+          return parseRawPath(parsedUrl.value);
         }
         return parseError(
           URL_ERROR_CODES.UNSUPPORTED_HOST,
@@ -950,10 +969,23 @@
         var _a, _b;
         const fetchImpl = options.fetchImpl || globalThis.fetch;
         if (typeof fetchImpl !== "function") {
-          throw new TypeError("fetch implementation is required.");
+          return {
+            ok: false,
+            status: 0,
+            content: null,
+            body: "fetch implementation is required.",
+            headers: {
+              wwwAuthenticate: ""
+            },
+            request: {
+              url: buildGithubContentsApiUrl(source),
+              tokenUsed: Boolean(options.token)
+            }
+          };
         }
         const token = options.token;
         const apiUrl = buildGithubContentsApiUrl(source);
+        const timeoutMs = Number.isFinite(options.timeoutMs) && Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 12e3;
         const headers = {
           accept: "application/vnd.github.raw+json"
         };
@@ -961,10 +993,36 @@
           headers.authorization = `Bearer ${token}`;
         }
         try {
-          const response = await fetchImpl(apiUrl, {
-            method: "GET",
-            headers
+          let timeoutId = null;
+          const timeoutPromise = new Promise((resolve) => {
+            timeoutId = setTimeout(() => resolve({ __timedOut: true }), timeoutMs);
           });
+          const responseOrTimeout = await Promise.race([
+            fetchImpl(apiUrl, {
+              method: "GET",
+              headers
+            }),
+            timeoutPromise
+          ]);
+          if (timeoutId !== null) {
+            clearTimeout(timeoutId);
+          }
+          if (responseOrTimeout && responseOrTimeout.__timedOut) {
+            return {
+              ok: false,
+              status: 0,
+              content: null,
+              body: `Request timeout after ${timeoutMs}ms`,
+              headers: {
+                wwwAuthenticate: ""
+              },
+              request: {
+                url: apiUrl,
+                tokenUsed: Boolean(token)
+              }
+            };
+          }
+          const response = responseOrTimeout;
           const body = await response.text();
           return {
             ok: response.ok,
@@ -1231,9 +1289,26 @@
     }
   });
 
+  // src/core/render/utf8ByteLength.ts
+  var require_utf8ByteLength = __commonJS({
+    "src/core/render/utf8ByteLength.ts"(exports, module) {
+      function byteLengthUtf8(input) {
+        const value = typeof input === "string" ? input : String(input != null ? input : "");
+        if (typeof TextEncoder === "function") {
+          return new TextEncoder().encode(value).length;
+        }
+        return encodeURIComponent(value).replace(/%[A-F\d]{2}/gi, "x").length;
+      }
+      module.exports = {
+        byteLengthUtf8
+      };
+    }
+  });
+
   // src/core/render/detectMinifiedJson.ts
   var require_detectMinifiedJson = __commonJS({
     "src/core/render/detectMinifiedJson.ts"(exports, module) {
+      var { byteLengthUtf8 } = require_utf8ByteLength();
       function detectMinifiedJson(content, options = {}) {
         if (typeof content !== "string") {
           return { isMinified: false, reason: "not_string" };
@@ -1246,7 +1321,7 @@
           return { isMinified: false, reason: "not_json_shape" };
         }
         const maxBytesForPrettyPrint = Number(options.maxBytesForPrettyPrint || 250 * 1024);
-        const bytes = Buffer.byteLength(trimmed, "utf8");
+        const bytes = byteLengthUtf8(trimmed);
         if (bytes > maxBytesForPrettyPrint) {
           return { isMinified: false, reason: "too_large_for_pretty_print" };
         }
@@ -1449,6 +1524,21 @@
       function isTableDivider(line) {
         return /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(line.trim());
       }
+      function isListLine(line) {
+        return /^\s*(?:[-*+]|\d+\.)\s+/.test(String(line || ""));
+      }
+      function getListDepth(rawLine) {
+        var _a, _b;
+        const leading = ((_b = (_a = String(rawLine || "").match(/^\s*/)) == null ? void 0 : _a[0]) == null ? void 0 : _b.replace(/\t/g, "  ").length) || 0;
+        return Math.max(1, Math.floor(leading / 2) + 1);
+      }
+      function stripListMarker(rawLine) {
+        return String(rawLine || "").replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim();
+      }
+      function isHorizontalRuleLine(line) {
+        const trimmed = String(line || "").trim();
+        return /^([-*_])(?:\s*\1){2,}$/.test(trimmed);
+      }
       function parseMarkdownBlocks(markdown) {
         const lines = String(markdown || "").split(/\r?\n/);
         const blocks = [];
@@ -1491,15 +1581,26 @@
             index += 1;
             continue;
           }
-          if (/^[-*+]\s+/.test(trimmed)) {
+          if (isHorizontalRuleLine(trimmed)) {
+            blocks.push({
+              type: "divider"
+            });
+            index += 1;
+            continue;
+          }
+          if (isListLine(line)) {
+            const ordered = /^\s*\d+\.\s+/.test(line);
             const items = [];
-            while (index < lines.length && /^[-*+]\s+/.test(lines[index].trim())) {
-              items.push(lines[index].trim().slice(2));
+            while (index < lines.length && isListLine(lines[index])) {
+              items.push({
+                content: stripListMarker(lines[index]),
+                depth: getListDepth(lines[index])
+              });
               index += 1;
             }
             blocks.push({
               type: "list",
-              ordered: false,
+              ordered,
               items
             });
             continue;
@@ -1520,11 +1621,11 @@
           }
           const paragraphLines = [line];
           index += 1;
-          while (index < lines.length && lines[index].trim() && !lines[index].trim().startsWith("```") && !/^#{1,6}\s+/.test(lines[index].trim()) && !/^[-*+]\s+/.test(lines[index].trim()) && !(lines[index].includes("|") && isTableDivider(lines[index + 1] || ""))) {
+          while (index < lines.length && lines[index].trim() && !lines[index].trim().startsWith("```") && !/^#{1,6}\s+/.test(lines[index].trim()) && !isListLine(lines[index]) && !(lines[index].includes("|") && isTableDivider(lines[index + 1] || ""))) {
             paragraphLines.push(lines[index]);
             index += 1;
           }
-          const paragraph = paragraphLines.join(" ").trim();
+          const paragraph = paragraphLines.join("\n").trim();
           blocks.push({
             type: "paragraph",
             content: paragraph,
@@ -1590,13 +1691,14 @@
       var { highlightCode } = require_highlightCode();
       var { renderMarkdown } = require_renderMarkdown();
       var { resolvePerformancePolicy } = require_performancePolicy();
+      var { byteLengthUtf8 } = require_utf8ByteLength();
       var previewCache = /* @__PURE__ */ new Map();
       function normalizeExtension(extension) {
         if (typeof extension !== "string") return "txt";
         return extension.replace(/^\./, "").toLowerCase();
       }
       function truncateToBytes(content, maxBytes) {
-        if (Buffer.byteLength(content, "utf8") <= maxBytes) {
+        if (byteLengthUtf8(content) <= maxBytes) {
           return content;
         }
         let end = content.length;
@@ -1605,7 +1707,7 @@
         while (start <= end) {
           const mid = Math.floor((start + end) / 2);
           const candidate = content.slice(0, mid);
-          const bytes = Buffer.byteLength(candidate, "utf8");
+          const bytes = byteLengthUtf8(candidate);
           if (bytes <= maxBytes) {
             best = candidate;
             start = mid + 1;
@@ -1634,7 +1736,7 @@
         const content = typeof (input == null ? void 0 : input.content) === "string" ? input.content : "";
         const sourceKey = String((input == null ? void 0 : input.sourceKey) || "");
         const extension = normalizeExtension(input == null ? void 0 : input.extension);
-        const inputBytes = Buffer.byteLength(content, "utf8");
+        const inputBytes = byteLengthUtf8(content);
         const cacheKey = `${sourceKey}:${extension}:${fastHash(content)}`;
         const cached = previewCache.get(cacheKey);
         if (cached) {
@@ -1648,9 +1750,10 @@
             })
           };
         }
+        const optionPolicy = options && typeof options.policy === "object" && options.policy ? options.policy : {};
         const policy = resolvePerformancePolicy(__spreadValues({
           inputBytes
-        }, options.policy));
+        }, optionPolicy));
         const warnings = [];
         const contentToRender = policy.shouldTruncate ? truncateToBytes(content, policy.previewBytes) : content;
         if (policy.shouldTruncate) {
@@ -1670,7 +1773,7 @@
           progressive: policy.mode === "progressive",
           metrics: {
             inputBytes,
-            renderBytes: Buffer.byteLength(contentToRender, "utf8"),
+            renderBytes: byteLengthUtf8(contentToRender),
             firstPreviewMs: Date.now() - startedAt,
             targetFirstPreviewMs: policy.targetFirstPreviewMs,
             cacheHit: false
@@ -2584,7 +2687,15 @@
   } = require_syncCoordinator();
   var { SYNC_MODE } = require_types2();
   var { widget } = figma;
-  var { AutoLayout, Text, useEffect, usePropertyMenu, useSyncedState, h } = widget;
+  var {
+    AutoLayout,
+    Text,
+    useEffect,
+    usePropertyMenu,
+    useSyncedState,
+    waitForTask,
+    h
+  } = widget;
   var AUTH_ERROR_CODES = Object.freeze({
     MISSING_PAT: "MISSING_PAT",
     EXPIRED_PAT: "EXPIRED_PAT",
@@ -2595,9 +2706,78 @@
     [AUTH_ERROR_CODES.EXPIRED_PAT]: "Tu personal access token es invalido o ha expirado.",
     [AUTH_ERROR_CODES.CURRENT_PAT]: "Tu personal access token no tiene permisos/scope suficiente."
   });
+  var PROPERTY_ACTION = Object.freeze({
+    OPEN_URL: "open_url",
+    REFRESH_NOW: "refresh_now",
+    WIDTH_DEC: "width_dec",
+    WIDTH_INC: "width_inc",
+    HEIGHT_DEC: "height_dec",
+    HEIGHT_INC: "height_inc"
+  });
   var syncCoordinator = createSyncCoordinator({ cooldownMs: 6e4 });
+  var CANVAS_SIZE_LIMITS = Object.freeze({
+    minWidth: 320,
+    maxWidth: 1800,
+    minHeight: 220,
+    maxHeight: 2200,
+    defaultWidth: 760,
+    defaultHeight: 920,
+    widthStep: 120,
+    heightStep: 120
+  });
+  var CANVAS_LAYOUT = Object.freeze({
+    root: {
+      spacing: 8,
+      padding: 12,
+      cornerRadius: 8
+    },
+    previewPanel: {
+      spacing: 8,
+      padding: 12,
+      cornerRadius: 8,
+      insetHorizontal: 16
+    },
+    divider: {
+      thickness: 1
+    },
+    table: {
+      rowSpacing: 0,
+      stackSpacing: 0,
+      cellPaddingVertical: 3,
+      cellPaddingHorizontal: 4,
+      borderWidth: 0.5
+    },
+    code: {
+      padding: 12,
+      cornerRadius: 8,
+      borderWidth: 0.5
+    }
+  });
   var runtimePatStorePromise = null;
   var autoRefreshBootstrapped = false;
+  var lastUiOpenNonce = 0;
+  var lastUiReadyNonce = 0;
+  var uiSessionPromise = null;
+  var resolveUiSession = null;
+  function ensureUiSessionTask() {
+    if (uiSessionPromise) {
+      return uiSessionPromise;
+    }
+    uiSessionPromise = new Promise((resolve) => {
+      resolveUiSession = resolve;
+    });
+    if (typeof waitForTask === "function") {
+      waitForTask(uiSessionPromise);
+    }
+    return uiSessionPromise;
+  }
+  function endUiSessionTask() {
+    if (typeof resolveUiSession === "function") {
+      resolveUiSession();
+    }
+    resolveUiSession = null;
+    uiSessionPromise = null;
+  }
   function getRuntimePatStore() {
     if (!runtimePatStorePromise) {
       runtimePatStorePromise = loadPatSessionStore({
@@ -2608,11 +2788,22 @@
     return runtimePatStorePromise;
   }
   function openWidgetUi() {
-    figma.showUI(__html__, {
+    const bundledHtml = typeof __widget_ui_html__ === "string" && __widget_ui_html__.trim().length > 0 ? __widget_ui_html__ : "";
+    const runtimeHtml = typeof __html__ === "string" && __html__.trim().length > 0 ? __html__ : "";
+    const html = bundledHtml || runtimeHtml || "<!doctype html><html><body><p>UI not available.</p></body></html>";
+    figma.showUI(html, {
       width: 420,
       height: 420,
-      title: "GitHub Preview Widget"
+      visible: true
     });
+    const uiVisible = figma.ui && typeof figma.ui.visible === "boolean" ? String(figma.ui.visible) : "unknown";
+    figma.notify(`UI visible: ${uiVisible}`);
+    const openNonce = ++lastUiOpenNonce;
+    setTimeout(() => {
+      if (lastUiReadyNonce < openNonce) {
+        figma.notify("UI opened but did not initialize.", { error: true });
+      }
+    }, 900);
   }
   function deriveSourceKey(url, embedBlock, embedSnapshot, authContext) {
     if (typeof (embedBlock == null ? void 0 : embedBlock.sourceKey) === "string" && embedBlock.sourceKey) {
@@ -2649,6 +2840,471 @@
       at: sync.lastUpdatedAt || (/* @__PURE__ */ new Date()).toISOString()
     };
   }
+  function clampText(value, maxChars) {
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return "";
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, Math.max(0, maxChars - 1))}\u2026`;
+  }
+  function readListItem(listItem) {
+    if (listItem && typeof listItem === "object") {
+      return {
+        content: String(listItem.content || ""),
+        depth: Math.max(1, Number(listItem.depth || 1))
+      };
+    }
+    return {
+      content: String(listItem || ""),
+      depth: 1
+    };
+  }
+  function listBulletForDepth(depth) {
+    if (depth <= 1) return "\u2022";
+    if (depth === 2) return "\u25E6";
+    return "\u25AA";
+  }
+  function buildUiPreviewTextFromBlock(block, options = {}) {
+    var _a;
+    const maxChars = Number.isFinite(Number(options.maxChars)) && Number(options.maxChars) > 0 ? Number(options.maxChars) : 2e5;
+    const parts = [];
+    const blocks = Array.isArray((_a = block == null ? void 0 : block.preview) == null ? void 0 : _a.blocks) ? block.preview.blocks : [];
+    for (const item of blocks) {
+      const type = typeof (item == null ? void 0 : item.type) === "string" ? item.type : "";
+      if (type === "heading") {
+        parts.push(`# ${String(item.content || "").trim()}`);
+        continue;
+      }
+      if (type === "paragraph") {
+        parts.push(String(item.content || ""));
+        continue;
+      }
+      if (type === "list" && Array.isArray(item.items)) {
+        const orderedCounters = {};
+        for (const entry of item.items) {
+          const normalized = readListItem(entry);
+          const indent = "  ".repeat(Math.max(0, normalized.depth - 1));
+          let prefix = listBulletForDepth(normalized.depth);
+          if (item.ordered) {
+            orderedCounters[normalized.depth] = (orderedCounters[normalized.depth] || 0) + 1;
+            for (const depthKey of Object.keys(orderedCounters)) {
+              if (Number(depthKey) > normalized.depth) {
+                delete orderedCounters[depthKey];
+              }
+            }
+            prefix = `${orderedCounters[normalized.depth]}.`;
+          }
+          parts.push(`${indent}${prefix} ${normalized.content}`);
+        }
+        continue;
+      }
+      if (type === "divider") {
+        parts.push("---");
+        continue;
+      }
+      if (type === "table") {
+        parts.push(String(item.content || ""));
+        continue;
+      }
+      if (type === "code" || type === "text") {
+        const language = typeof item.language === "string" && item.language ? item.language : "txt";
+        parts.push(`\`\`\`${language}`);
+        parts.push(String(item.content || ""));
+        parts.push("```");
+        continue;
+      }
+      if (typeof (item == null ? void 0 : item.content) === "string" && item.content) {
+        parts.push(item.content);
+      }
+    }
+    let text = parts.join("\n\n").trim();
+    if (!text) {
+      return "";
+    }
+    if (text.length > maxChars) {
+      text = `${text.slice(0, maxChars)}
+
+[preview truncated in UI]`;
+    }
+    return text;
+  }
+  function toNumberOrFallback(value, fallback) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    return num;
+  }
+  function clampCanvasSize(input = {}) {
+    const width = Math.round(
+      Math.max(
+        CANVAS_SIZE_LIMITS.minWidth,
+        Math.min(CANVAS_SIZE_LIMITS.maxWidth, toNumberOrFallback(input.width, CANVAS_SIZE_LIMITS.defaultWidth))
+      )
+    );
+    const height = Math.round(
+      Math.max(
+        CANVAS_SIZE_LIMITS.minHeight,
+        Math.min(
+          CANVAS_SIZE_LIMITS.maxHeight,
+          toNumberOrFallback(input.height, CANVAS_SIZE_LIMITS.defaultHeight)
+        )
+      )
+    );
+    return { width, height };
+  }
+  function fitPreviewTextForCanvas(inputText, options = {}) {
+    const text = typeof inputText === "string" ? inputText : "";
+    if (!text) return "";
+    const width = Math.max(180, Number(options.width || CANVAS_SIZE_LIMITS.defaultWidth));
+    const height = Math.max(120, Number(options.height || CANVAS_SIZE_LIMITS.defaultHeight));
+    const charsPerLine = Math.max(28, Math.floor((width - 48) / 6.2));
+    const maxLines = Math.max(8, Math.floor((height - 24) / 14));
+    const sourceLines = text.split(/\r?\n/);
+    const out = [];
+    for (const rawLine of sourceLines) {
+      if (out.length >= maxLines) break;
+      const line = String(rawLine || "");
+      if (!line) {
+        out.push("");
+        continue;
+      }
+      let cursor = 0;
+      while (cursor < line.length && out.length < maxLines) {
+        out.push(line.slice(cursor, cursor + charsPerLine));
+        cursor += charsPerLine;
+      }
+    }
+    if (out.length >= maxLines && sourceLines.length > 0) {
+      const last = out[maxLines - 1] || "";
+      out[maxLines - 1] = clampText(last, Math.max(1, charsPerLine - 1));
+      out[maxLines - 1] = `${out[maxLines - 1]}\u2026`;
+    }
+    return out.join("\n");
+  }
+  function buildUiPreviewPayload(block) {
+    const preview = (block == null ? void 0 : block.preview) || {};
+    return {
+      previewKind: typeof preview.kind === "string" && preview.kind ? preview.kind : "text",
+      previewBlocks: Array.isArray(preview.blocks) ? preview.blocks : []
+    };
+  }
+  function stripInlineMarkdown(value) {
+    let text = String(value || "");
+    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1");
+    text = text.replace(/`([^`]+)`/g, "$1");
+    text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+    text = text.replace(/__([^_]+)__/g, "$1");
+    text = text.replace(/\*([^*\n]+)\*/g, "$1");
+    text = text.replace(/_([^_\n]+)_/g, "$1");
+    return text;
+  }
+  function parseCanvasTable(content, options = {}) {
+    const maxCols = Math.max(2, Number(options.maxCols || 4));
+    const maxRows = Math.max(1, Number(options.maxRows || 6));
+    const lines = String(content || "").split(/\r?\n/g).map((line) => line.trimEnd()).filter(Boolean);
+    if (lines.length < 2) return null;
+    const divider = lines[1].replace(/\|/g, "").trim();
+    if (!/^[:\-\s]+$/.test(divider)) return null;
+    const parseRow = (line) => stripInlineMarkdown(line).replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    const header = parseRow(lines[0]).slice(0, maxCols);
+    if (!header.length) return null;
+    const rows = [];
+    for (const line of lines.slice(2)) {
+      if (rows.length >= maxRows) break;
+      const row = parseRow(line).slice(0, maxCols);
+      while (row.length < header.length) {
+        row.push("");
+      }
+      rows.push(row);
+    }
+    return {
+      header,
+      rows
+    };
+  }
+  function estimateCanvasUnitsFromText(text, charsPerLine) {
+    const lines = String(text || "").split(/\r?\n/g);
+    let units = 0;
+    for (const line of lines) {
+      const length = Math.max(1, String(line || "").length);
+      units += Math.max(1, Math.ceil(length / Math.max(12, charsPerLine)));
+    }
+    return Math.max(1, units);
+  }
+  function buildCanvasPreviewEntries(blocks, options = {}) {
+    const sourceBlocks = Array.isArray(blocks) ? blocks : [];
+    if (!sourceBlocks.length) return [];
+    const width = Math.max(180, Number(options.width || CANVAS_SIZE_LIMITS.defaultWidth));
+    const height = Math.max(120, Number(options.height || CANVAS_SIZE_LIMITS.defaultHeight));
+    const charsPerLine = Math.max(24, Math.floor((width - 20) / 6.2));
+    const maxUnits = Math.max(24, Math.floor(height / 14) * 2);
+    const out = [];
+    let usedUnits = 0;
+    const pushEntry = (entry, estimatedUnits) => {
+      const units = Math.max(1, Number(estimatedUnits || 1));
+      if (usedUnits + units > maxUnits && out.length > 0) {
+        return false;
+      }
+      out.push(entry);
+      usedUnits += units;
+      return true;
+    };
+    for (const block of sourceBlocks) {
+      if (usedUnits >= maxUnits) break;
+      const type = typeof (block == null ? void 0 : block.type) === "string" ? block.type : "text";
+      if (type === "heading") {
+        const text = stripInlineMarkdown(block.content || "");
+        if (!pushEntry(
+          {
+            type: "text",
+            text,
+            style: { fontSize: 11, fontWeight: 700, fill: "#111827" }
+          },
+          estimateCanvasUnitsFromText(text, charsPerLine)
+        )) {
+          break;
+        }
+        continue;
+      }
+      if (type === "paragraph") {
+        const text = stripInlineMarkdown(block.content || "");
+        if (!pushEntry(
+          {
+            type: "text",
+            text,
+            style: { fontSize: 10, fill: "#1F2937" }
+          },
+          estimateCanvasUnitsFromText(text, charsPerLine)
+        )) {
+          break;
+        }
+        continue;
+      }
+      if (type === "list" && Array.isArray(block.items)) {
+        const orderedCounters = {};
+        for (const item of block.items) {
+          const normalized = readListItem(item);
+          const indent = "  ".repeat(Math.max(0, normalized.depth - 1));
+          let prefix = listBulletForDepth(normalized.depth);
+          if (block.ordered) {
+            orderedCounters[normalized.depth] = (orderedCounters[normalized.depth] || 0) + 1;
+            for (const depthKey of Object.keys(orderedCounters)) {
+              if (Number(depthKey) > normalized.depth) {
+                delete orderedCounters[depthKey];
+              }
+            }
+            prefix = `${orderedCounters[normalized.depth]}.`;
+          }
+          const line = `${indent}${prefix} ${stripInlineMarkdown(normalized.content)}`;
+          if (!pushEntry(
+            {
+              type: "text",
+              text: line,
+              style: { fontSize: 10, fill: "#1F2937" }
+            },
+            estimateCanvasUnitsFromText(line, charsPerLine)
+          )) {
+            break;
+          }
+        }
+        continue;
+      }
+      if (type === "table") {
+        const remainingUnits = Math.max(2, maxUnits - usedUnits);
+        const table = parseCanvasTable(block.content, {
+          maxCols: Math.max(2, Math.min(6, Math.floor(width / 140))),
+          maxRows: Math.max(1, remainingUnits - 1)
+        });
+        if (table && table.header.length > 0) {
+          if (!pushEntry(
+            {
+              type: "table",
+              header: table.header,
+              rows: table.rows
+            },
+            1 + table.rows.length
+          )) {
+            break;
+          }
+          continue;
+        }
+        const fallback2 = stripInlineMarkdown(block.content || "");
+        if (!pushEntry(
+          {
+            type: "text",
+            text: fallback2,
+            style: { fontSize: 9, fill: "#334155" }
+          },
+          estimateCanvasUnitsFromText(fallback2, charsPerLine)
+        )) {
+          break;
+        }
+        continue;
+      }
+      if (type === "divider") {
+        if (!pushEntry(
+          {
+            type: "divider"
+          },
+          1
+        )) {
+          break;
+        }
+        continue;
+      }
+      if (type === "code" || type === "text" || type === "mermaid") {
+        const language = typeof block.language === "string" && block.language ? block.language : type === "mermaid" ? "mermaid" : "txt";
+        const content = String(block.content || "");
+        const payload = `[${language}]
+${content}`;
+        if (!pushEntry(
+          {
+            type: "code",
+            text: payload,
+            style: { fontSize: 9, fill: "#0F172A" }
+          },
+          estimateCanvasUnitsFromText(payload, charsPerLine)
+        )) {
+          break;
+        }
+        continue;
+      }
+      const fallback = stripInlineMarkdown((block == null ? void 0 : block.content) || "");
+      if (!pushEntry(
+        {
+          type: "text",
+          text: fallback,
+          style: { fontSize: 10, fill: "#1F2937" }
+        },
+        estimateCanvasUnitsFromText(fallback, charsPerLine)
+      )) {
+        break;
+      }
+    }
+    if (usedUnits >= maxUnits && out.length > 0) {
+      out.push({
+        type: "text",
+        text: "\u2026",
+        style: { fontSize: 10, fill: "#64748B" }
+      });
+    }
+    return out;
+  }
+  function renderCanvasPreviewEntry(entry, previewPanelWidth) {
+    var _a, _b, _c, _d;
+    if ((entry == null ? void 0 : entry.type) === "divider") {
+      return h(AutoLayout, {
+        width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
+        height: CANVAS_LAYOUT.divider.thickness,
+        fill: "#CBD5E1"
+      });
+    }
+    if ((entry == null ? void 0 : entry.type) === "table" && Array.isArray(entry.header)) {
+      const colCount = Math.max(1, entry.header.length);
+      const tableWidth = previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal;
+      const cellWidth = Math.max(56, Math.floor(tableWidth / colCount));
+      const renderRow = (cells, isHeader) => h(
+        AutoLayout,
+        {
+          direction: "horizontal",
+          spacing: CANVAS_LAYOUT.table.rowSpacing,
+          width: tableWidth,
+          fill: isHeader ? "#F1F5F9" : "#FFFFFF"
+        },
+        ...cells.map(
+          (cell) => h(
+            AutoLayout,
+            {
+              width: cellWidth,
+              padding: {
+                vertical: CANVAS_LAYOUT.table.cellPaddingVertical,
+                horizontal: CANVAS_LAYOUT.table.cellPaddingHorizontal
+              },
+              stroke: "#CBD5E1",
+              strokeWidth: CANVAS_LAYOUT.table.borderWidth
+            },
+            h(
+              Text,
+              {
+                fontSize: isHeader ? 9 : 8,
+                fontWeight: isHeader ? 600 : 400,
+                fill: "#0F172A",
+                width: cellWidth - CANVAS_LAYOUT.table.cellPaddingHorizontal * 2
+              },
+              String(cell || "")
+            )
+          )
+        )
+      );
+      const rows = Array.isArray(entry.rows) ? entry.rows : [];
+      return h(
+        AutoLayout,
+        {
+          direction: "vertical",
+          spacing: CANVAS_LAYOUT.table.stackSpacing,
+          width: tableWidth
+        },
+        renderRow(entry.header, true),
+        ...rows.map((row) => {
+          const normalized = Array.isArray(row) ? row : [];
+          while (normalized.length < colCount) {
+            normalized.push("");
+          }
+          return renderRow(normalized.slice(0, colCount), false);
+        })
+      );
+    }
+    if ((entry == null ? void 0 : entry.type) === "code") {
+      const codeBlockWidth = previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal;
+      return h(
+        AutoLayout,
+        {
+          direction: "vertical",
+          width: codeBlockWidth,
+          padding: CANVAS_LAYOUT.code.padding,
+          fill: "#F8FAFC",
+          stroke: "#CBD5E1",
+          strokeWidth: CANVAS_LAYOUT.code.borderWidth,
+          cornerRadius: CANVAS_LAYOUT.code.cornerRadius
+        },
+        h(
+          Text,
+          {
+            fontSize: 9,
+            fill: ((_a = entry == null ? void 0 : entry.style) == null ? void 0 : _a.fill) || "#0F172A",
+            width: codeBlockWidth - CANVAS_LAYOUT.code.padding * 2
+          },
+          String((entry == null ? void 0 : entry.text) || "")
+        )
+      );
+    }
+    return h(
+      Text,
+      {
+        fontSize: ((_b = entry == null ? void 0 : entry.style) == null ? void 0 : _b.fontSize) || 10,
+        fontWeight: ((_c = entry == null ? void 0 : entry.style) == null ? void 0 : _c.fontWeight) || 400,
+        fill: ((_d = entry == null ? void 0 : entry.style) == null ? void 0 : _d.fill) || "#2F2F2F",
+        width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal
+      },
+      String((entry == null ? void 0 : entry.text) || "")
+    );
+  }
+  function postToUiSafely(payload) {
+    try {
+      figma.ui.postMessage(payload);
+      return true;
+    } catch (error) {
+      const message = error && typeof error.message === "string" ? error.message : String(error);
+      if (/No UI to send a message to/i.test(message)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+  function deriveProgressPercent(syncStatus) {
+    if (syncStatus === "success") return 100;
+    if (syncStatus === "error") return 100;
+    if (syncStatus === "syncing") return 25;
+    return 0;
+  }
   function resolveRuntimeError(pipelineError, auth) {
     const code = typeof (pipelineError == null ? void 0 : pipelineError.code) === "string" && pipelineError.code ? pipelineError.code : "UNKNOWN";
     const authMessage = AUTH_MESSAGES[code];
@@ -2664,7 +3320,7 @@
     };
   }
   function GitHubPreviewWidget() {
-    var _a;
+    var _a, _b;
     const [status, setStatus] = useSyncedState(
       "runtime-status",
       "Ready: open URL input"
@@ -2677,16 +3333,48 @@
       "auto-refresh-map",
       {}
     );
+    const [canvasSize, setCanvasSize] = useSyncedState(
+      "canvas-size",
+      clampCanvasSize()
+    );
+    function postWidgetContextToUi() {
+      var _a2;
+      const previewSummary2 = buildUiPreviewTextFromBlock(embedBlock, {
+        maxChars: 2e5
+      });
+      const previewPayload = buildUiPreviewPayload(embedBlock);
+      const syncState = ((_a2 = embedBlock == null ? void 0 : embedBlock.sync) == null ? void 0 : _a2.status) || "idle";
+      postToUiSafely(__spreadValues({
+        type: UI_EVENT.WIDGET_CONTEXT,
+        widgetId: "active-widget",
+        lastUrl,
+        status,
+        authContext,
+        lastResult: buildLastResult(embedSnapshot, embedBlock),
+        syncState,
+        progressPercent: deriveProgressPercent(syncState),
+        previewSummary: previewSummary2
+      }, previewPayload));
+    }
     function postRuntimeStatus(level, message, details = "", extras = {}) {
-      figma.ui.postMessage(__spreadValues({
+      const hasPreviewSummary = typeof (extras == null ? void 0 : extras.previewSummary) === "string";
+      const hasPreviewBlocks = Array.isArray(extras == null ? void 0 : extras.previewBlocks);
+      const hasPreviewKind = typeof (extras == null ? void 0 : extras.previewKind) === "string";
+      const fallbackPreviewPayload = buildUiPreviewPayload(embedBlock);
+      postToUiSafely(__spreadValues({
         type: UI_EVENT.RUNTIME_STATUS,
         level,
         message,
-        details
+        details,
+        previewSummary: hasPreviewSummary ? extras.previewSummary : buildUiPreviewTextFromBlock(embedBlock, {
+          maxChars: 2e5
+        }),
+        previewKind: hasPreviewKind ? extras.previewKind : fallbackPreviewPayload.previewKind,
+        previewBlocks: hasPreviewBlocks ? extras.previewBlocks : fallbackPreviewPayload.previewBlocks
       }, extras));
     }
     async function runPreviewPipeline(url, trigger, options = {}) {
-      var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
       const mode = options.mode === SYNC_MODE.AUTO ? SYNC_MODE.AUTO : SYNC_MODE.MANUAL;
       const normalizedUrl = typeof url === "string" ? url.trim() : "";
       if (!normalizedUrl) {
@@ -2696,6 +3384,12 @@
       }
       const sourceKeyForRun = typeof options.sourceKey === "string" && options.sourceKey ? options.sourceKey : deriveSourceKey(normalizedUrl, embedBlock, embedSnapshot, authContext);
       let lockAcquired = false;
+      const loadingMessage = mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...";
+      let progressPercent = mode === SYNC_MODE.AUTO ? 12 : 8;
+      let progressTimer = null;
+      const pushProgress = () => postRuntimeStatus("loading", loadingMessage, "", {
+        progressPercent
+      });
       if (!options.skipManualLock) {
         const lock = syncCoordinator.beginManual({
           sourceKey: sourceKeyForRun,
@@ -2704,15 +3398,27 @@
         if (!lock.ok) {
           setStatus("Syncing...");
           postRuntimeStatus("loading", "Syncing...", "", {
-            reason: lock.reason
+            reason: lock.reason,
+            progressPercent: 25
           });
           return { ok: false, skipped: true, reason: lock.reason };
         }
         lockAcquired = true;
       }
       try {
-        setStatus(mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
-        postRuntimeStatus("loading", mode === SYNC_MODE.AUTO ? "Auto-syncing..." : "Syncing...");
+        setStatus(loadingMessage);
+        pushProgress();
+        progressTimer = setInterval(() => {
+          if (progressPercent < 45) {
+            progressPercent += 7;
+          } else if (progressPercent < 70) {
+            progressPercent += 4;
+          } else if (progressPercent < 92) {
+            progressPercent += 2;
+          }
+          progressPercent = Math.min(92, progressPercent);
+          pushProgress();
+        }, 320);
         if (mode === SYNC_MODE.MANUAL) {
           figma.notify("Syncing...");
         }
@@ -2725,7 +3431,11 @@
           mode
         });
         if (!pipeline.ok) {
-          if ((_b = pipeline.value) == null ? void 0 : _b.embedBlock) {
+          if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+          }
+          if ((_b2 = pipeline.value) == null ? void 0 : _b2.embedBlock) {
             setEmbedBlock(pipeline.value.embedBlock);
           }
           if ((_c = pipeline.value) == null ? void 0 : _c.snapshot) {
@@ -2743,13 +3453,17 @@
             (_e = pipeline.value) == null ? void 0 : _e.embedBlock
           );
           setStatus(`Sync error: ${runtimeError.code}`);
-          postRuntimeStatus("error", runtimeError.message, runtimeError.details, {
+          postRuntimeStatus("error", runtimeError.message, runtimeError.details, __spreadValues({
             code: runtimeError.code,
             sourceKey: runtimeError.sourceKey,
             authRequired: runtimeError.authRequired,
             syncState: ((_h = (_g = (_f = pipeline.value) == null ? void 0 : _f.embedBlock) == null ? void 0 : _g.sync) == null ? void 0 : _h.status) || "error",
-            lastResult: lastResult3
-          });
+            lastResult: lastResult3,
+            progressPercent: 100,
+            previewSummary: buildUiPreviewTextFromBlock((_i = pipeline.value) == null ? void 0 : _i.embedBlock, {
+              maxChars: 2e5
+            })
+          }, buildUiPreviewPayload((_j = pipeline.value) == null ? void 0 : _j.embedBlock)));
           if (mode === SYNC_MODE.MANUAL) {
             figma.notify(runtimeError.message, { error: true });
           }
@@ -2762,15 +3476,50 @@
         const lastResult2 = buildLastResult(pipeline.value.snapshot, pipeline.value.embedBlock);
         const successMessage = mode === SYNC_MODE.AUTO ? "Auto-sync completed." : "Preview created.";
         setStatus(mode === SYNC_MODE.AUTO ? `Auto-sync ready (${trigger})` : `Preview ready (${trigger})`);
-        postRuntimeStatus("success", successMessage, "", {
-          syncState: ((_j = (_i = pipeline.value.embedBlock) == null ? void 0 : _i.sync) == null ? void 0 : _j.status) || "success",
-          lastResult: lastResult2
-        });
+        if (progressTimer) {
+          clearInterval(progressTimer);
+          progressTimer = null;
+        }
+        postRuntimeStatus("success", successMessage, "", __spreadValues({
+          syncState: ((_l = (_k = pipeline.value.embedBlock) == null ? void 0 : _k.sync) == null ? void 0 : _l.status) || "success",
+          lastResult: lastResult2,
+          progressPercent: 100,
+          previewSummary: buildUiPreviewTextFromBlock((_m = pipeline.value) == null ? void 0 : _m.embedBlock, {
+            maxChars: 2e5
+          })
+        }, buildUiPreviewPayload((_n = pipeline.value) == null ? void 0 : _n.embedBlock)));
         if (mode === SYNC_MODE.MANUAL) {
           figma.notify("Preview created.");
         }
         return pipeline;
+      } catch (error) {
+        const details = error && typeof error.message === "string" ? error.message : String(error);
+        const message = "Unexpected pipeline failure.";
+        setStatus("Sync error: UNEXPECTED");
+        postRuntimeStatus("error", message, details, __spreadValues({
+          code: "UNEXPECTED",
+          syncState: "error",
+          progressPercent: 100,
+          lastResult: {
+            status: "error",
+            mode,
+            message,
+            details,
+            at: (/* @__PURE__ */ new Date()).toISOString()
+          },
+          previewSummary: buildUiPreviewTextFromBlock(embedBlock, {
+            maxChars: 2e5
+          })
+        }, buildUiPreviewPayload(embedBlock)));
+        if (mode === SYNC_MODE.MANUAL) {
+          figma.notify(message, { error: true });
+        }
+        return { ok: false, skipped: true, error: { code: "UNEXPECTED", details } };
       } finally {
+        if (progressTimer) {
+          clearInterval(progressTimer);
+          progressTimer = null;
+        }
         if (lockAcquired) {
           syncCoordinator.endManual(sourceKeyForRun);
         }
@@ -2813,45 +3562,94 @@
         {
           itemType: "action",
           tooltip: "Set GitHub URL",
-          propertyName: "open-url"
+          propertyName: PROPERTY_ACTION.OPEN_URL
         },
         {
           itemType: "action",
           tooltip: "Refresh preview",
-          propertyName: "refresh-now"
+          propertyName: PROPERTY_ACTION.REFRESH_NOW
+        },
+        {
+          itemType: "action",
+          tooltip: "Width -",
+          propertyName: PROPERTY_ACTION.WIDTH_DEC
+        },
+        {
+          itemType: "action",
+          tooltip: "Width +",
+          propertyName: PROPERTY_ACTION.WIDTH_INC
+        },
+        {
+          itemType: "action",
+          tooltip: "Height -",
+          propertyName: PROPERTY_ACTION.HEIGHT_DEC
+        },
+        {
+          itemType: "action",
+          tooltip: "Height +",
+          propertyName: PROPERTY_ACTION.HEIGHT_INC
         }
       ],
-      (event) => {
-        var _a2;
-        if (event.propertyName === "open-url") {
-          openWidgetUi();
-          figma.ui.postMessage({
-            type: UI_EVENT.WIDGET_CONTEXT,
-            widgetId: "active-widget",
-            lastUrl,
-            status,
-            authContext,
-            lastResult: buildLastResult(embedSnapshot, embedBlock),
-            syncState: ((_a2 = embedBlock == null ? void 0 : embedBlock.sync) == null ? void 0 : _a2.status) || "idle"
-          });
-          void maybeRunAutoRefresh("open-url");
-          return;
+      async (event) => {
+        const propertyName = typeof (event == null ? void 0 : event.propertyName) === "string" ? event.propertyName : "";
+        if (propertyName === PROPERTY_ACTION.OPEN_URL || propertyName === "open-url") {
+          ensureUiSessionTask();
+          await (async () => {
+            try {
+              openWidgetUi();
+            } catch (error) {
+              const detail = error && typeof error.message === "string" ? error.message : String(error);
+              setStatus("Could not open URL input");
+              figma.notify(`Could not open URL input: ${detail}`, { error: true });
+              return;
+            }
+            await Promise.resolve();
+            postWidgetContextToUi();
+            figma.notify("URL input opened.");
+            void maybeRunAutoRefresh("open-url");
+          })();
+          return uiSessionPromise || Promise.resolve();
         }
-        if (event.propertyName === "refresh-now") {
+        if (propertyName === PROPERTY_ACTION.REFRESH_NOW || propertyName === "refresh-now") {
           if (!lastUrl) {
             setStatus("Refresh blocked: no URL set");
             postRuntimeStatus("error", "No URL available for refresh.");
             figma.notify("No URL available for refresh.", { error: true });
             return;
           }
-          void runPreviewPipeline(lastUrl, "property-menu-refresh", {
+          await runPreviewPipeline(lastUrl, "property-menu-refresh", {
             mode: SYNC_MODE.MANUAL
           });
+          return;
+        }
+        if (propertyName === PROPERTY_ACTION.WIDTH_DEC || propertyName === PROPERTY_ACTION.WIDTH_INC || propertyName === PROPERTY_ACTION.HEIGHT_DEC || propertyName === PROPERTY_ACTION.HEIGHT_INC) {
+          const baseSize = canvasSize && typeof canvasSize === "object" ? clampCanvasSize(canvasSize) : clampCanvasSize();
+          const widthDelta = propertyName === PROPERTY_ACTION.WIDTH_INC ? CANVAS_SIZE_LIMITS.widthStep : propertyName === PROPERTY_ACTION.WIDTH_DEC ? -CANVAS_SIZE_LIMITS.widthStep : 0;
+          const heightDelta = propertyName === PROPERTY_ACTION.HEIGHT_INC ? CANVAS_SIZE_LIMITS.heightStep : propertyName === PROPERTY_ACTION.HEIGHT_DEC ? -CANVAS_SIZE_LIMITS.heightStep : 0;
+          const nextSize = clampCanvasSize({
+            width: baseSize.width + widthDelta,
+            height: baseSize.height + heightDelta
+          });
+          setCanvasSize(nextSize);
+          setStatus(`Canvas resized: ${nextSize.width} \xD7 ${nextSize.height}`);
+          return;
         }
       }
     );
     useEffect(() => {
       figma.ui.onmessage = (message) => {
+        if (message && message.type === "ui-closed") {
+          endUiSessionTask();
+          setStatus("UI closed");
+          return;
+        }
+        if (message && message.type === "ui-ready") {
+          lastUiReadyNonce = lastUiOpenNonce;
+          setStatus("UI ready");
+          postWidgetContextToUi();
+          figma.notify("UI initialized.");
+          return;
+        }
         const parsed = parseUiCommand(message);
         if (!parsed.ok) {
           setStatus(`Bridge error: ${parsed.error.code}`);
@@ -2929,18 +3727,49 @@
         figma.ui.onmessage = void 0;
       };
     });
+    const effectiveCanvasSize = canvasSize && typeof canvasSize === "object" ? clampCanvasSize(canvasSize) : clampCanvasSize();
+    const previewSummary = buildUiPreviewTextFromBlock(embedBlock, {
+      maxChars: 2e5
+    });
+    const previewPanelWidth = Math.max(
+      200,
+      effectiveCanvasSize.width - CANVAS_LAYOUT.root.padding * 2
+    );
+    const previewViewportHeight = Math.max(180, effectiveCanvasSize.height - 220);
+    const canvasPreviewText = fitPreviewTextForCanvas(previewSummary, {
+      width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
+      height: previewViewportHeight
+    });
+    const canvasPreviewEntries = buildCanvasPreviewEntries((_a = embedBlock == null ? void 0 : embedBlock.preview) == null ? void 0 : _a.blocks, {
+      width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
+      height: previewViewportHeight
+    });
     const lastResult = buildLastResult(embedSnapshot, embedBlock);
-    return h(
-      AutoLayout,
-      {
-        direction: "vertical",
-        width: 420,
-        spacing: 8,
-        padding: 12,
-        fill: "#FFFFFF",
-        stroke: "#D9D9D9",
-        cornerRadius: 8
-      },
+    const previewChildren = canvasPreviewEntries.length > 0 ? [
+      h(
+        AutoLayout,
+        {
+          direction: "vertical",
+          spacing: CANVAS_LAYOUT.previewPanel.spacing,
+          width: previewPanelWidth,
+          height: previewViewportHeight,
+          fill: "#FAFAFA",
+          stroke: "#E6E6E6",
+          cornerRadius: CANVAS_LAYOUT.previewPanel.cornerRadius,
+          padding: CANVAS_LAYOUT.previewPanel.padding
+        },
+        ...canvasPreviewEntries.map(
+          (entry) => renderCanvasPreviewEntry(entry, previewPanelWidth)
+        )
+      )
+    ] : [
+      h(
+        Text,
+        { fontSize: 10, fill: "#8B8B8B" },
+        canvasPreviewText.trim().length > 0 ? canvasPreviewText : "Preview: pending"
+      )
+    ];
+    const children = [
       h(Text, { fontSize: 12, fontWeight: 600 }, "GitHub Preview Widget"),
       h(Text, { fontSize: 11, fill: "#5C5C5C" }, status),
       h(
@@ -2961,13 +3790,34 @@
       h(
         Text,
         { fontSize: 10, fill: "#8B8B8B" },
-        embedSnapshot ? `Warnings: ${embedSnapshot.warningCount || 0} \xB7 Progressive: ${((_a = embedSnapshot.render) == null ? void 0 : _a.progressive) ? "yes" : "no"}` : "Warnings: 0 \xB7 Progressive: no"
+        embedSnapshot ? `Warnings: ${embedSnapshot.warningCount || 0} \xB7 Progressive: ${((_b = embedSnapshot.render) == null ? void 0 : _b.progressive) ? "yes" : "no"}` : "Warnings: 0 \xB7 Progressive: no"
       ),
       h(
         Text,
         { fontSize: 10, fill: "#8B8B8B" },
         `Last result: ${lastResult.status || "idle"} (${lastResult.mode || "manual"})`
-      )
+      ),
+      h(
+        Text,
+        { fontSize: 10, fill: "#8B8B8B" },
+        `Canvas: ${effectiveCanvasSize.width} \xD7 ${effectiveCanvasSize.height}`
+      ),
+      h(Text, { fontSize: 10, fontWeight: 600, fill: "#1F1F1F" }, "Preview"),
+      ...previewChildren
+    ];
+    return h(
+      AutoLayout,
+      {
+        direction: "vertical",
+        width: effectiveCanvasSize.width,
+        height: effectiveCanvasSize.height,
+        spacing: CANVAS_LAYOUT.root.spacing,
+        padding: CANVAS_LAYOUT.root.padding,
+        fill: "#FFFFFF",
+        stroke: "#D9D9D9",
+        cornerRadius: CANVAS_LAYOUT.root.cornerRadius
+      },
+      ...children
     );
   }
   widget.register(GitHubPreviewWidget);

@@ -68,3 +68,11 @@ test("degrades unsupported markdown structures to paragraph", () => {
   assert.equal(result.ok, true);
   assert.equal(result.value.blocks[0].type, "paragraph");
 });
+
+test("parses horizontal rules as divider blocks", () => {
+  const input = ["before", "", "---", "", "***", "", "after"].join("\n");
+  const result = renderMarkdown(input);
+  assert.equal(result.ok, true);
+  const types = result.value.blocks.map((block) => block.type);
+  assert.deepEqual(types, ["paragraph", "divider", "divider", "paragraph"]);
+});

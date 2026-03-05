@@ -1,16 +1,28 @@
+// @ts-nocheck
+
 const { highlightCode } = require("./highlightCode.ts");
 const { renderMarkdown } = require("./renderMarkdown.ts");
 const { resolvePerformancePolicy } = require("./performancePolicy.ts");
+const { byteLengthUtf8 } = require("./utf8ByteLength.ts");
 
 const previewCache = new Map();
 
+/**
+ * @param {unknown} extension
+ * @returns {string}
+ */
 function normalizeExtension(extension) {
   if (typeof extension !== "string") return "txt";
   return extension.replace(/^\./, "").toLowerCase();
 }
 
+/**
+ * @param {string} content
+ * @param {number} maxBytes
+ * @returns {string}
+ */
 function truncateToBytes(content, maxBytes) {
-  if (Buffer.byteLength(content, "utf8") <= maxBytes) {
+  if (byteLengthUtf8(content) <= maxBytes) {
     return content;
   }
 
@@ -21,7 +33,7 @@ function truncateToBytes(content, maxBytes) {
   while (start <= end) {
     const mid = Math.floor((start + end) / 2);
     const candidate = content.slice(0, mid);
-    const bytes = Buffer.byteLength(candidate, "utf8");
+    const bytes = byteLengthUtf8(candidate);
     if (bytes <= maxBytes) {
       best = candidate;
       start = mid + 1;
@@ -33,6 +45,10 @@ function truncateToBytes(content, maxBytes) {
   return best;
 }
 
+/**
+ * @param {string} content
+ * @returns {string}
+ */
 function fastHash(content) {
   const probe = content.slice(0, 1024);
   let hash = 0;
@@ -42,6 +58,10 @@ function fastHash(content) {
   return `${content.length}:${hash}`;
 }
 
+/**
+ * @param {string} extension
+ * @param {string} content
+ */
 function renderByExtension(extension, content) {
   if (extension === "md") {
     return renderMarkdown(content);
@@ -50,12 +70,16 @@ function renderByExtension(extension, content) {
   return highlightCode({ extension, content });
 }
 
+/**
+ * @param {{ content?: unknown; sourceKey?: unknown; extension?: unknown } | null | undefined} input
+ * @param {{ policy?: Record<string, unknown> } | null | undefined} [options]
+ */
 function renderFilePreview(input, options = {}) {
   const startedAt = Date.now();
   const content = typeof input?.content === "string" ? input.content : "";
   const sourceKey = String(input?.sourceKey || "");
   const extension = normalizeExtension(input?.extension);
-  const inputBytes = Buffer.byteLength(content, "utf8");
+  const inputBytes = byteLengthUtf8(content);
 
   const cacheKey = `${sourceKey}:${extension}:${fastHash(content)}`;
   const cached = previewCache.get(cacheKey);
@@ -73,9 +97,11 @@ function renderFilePreview(input, options = {}) {
     };
   }
 
+  const optionPolicy =
+    options && typeof options.policy === "object" && options.policy ? options.policy : {};
   const policy = resolvePerformancePolicy({
     inputBytes,
-    ...options.policy,
+    ...optionPolicy,
   });
 
   const warnings = [];
@@ -102,7 +128,7 @@ function renderFilePreview(input, options = {}) {
     progressive: policy.mode === "progressive",
     metrics: {
       inputBytes,
-      renderBytes: Buffer.byteLength(contentToRender, "utf8"),
+      renderBytes: byteLengthUtf8(contentToRender),
       firstPreviewMs: Date.now() - startedAt,
       targetFirstPreviewMs: policy.targetFirstPreviewMs,
       cacheHit: false,

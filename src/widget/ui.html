@@ -133,6 +133,127 @@
         font-size: 10px;
         color: #475569;
       }
+
+      .progress-line {
+        font-size: 10px;
+        color: #334155;
+      }
+
+      .progress-track {
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: #0f766e;
+        transition: width 160ms linear;
+      }
+
+      .preview-panel {
+        display: grid;
+        gap: 6px;
+      }
+
+      .preview-text {
+        margin: 0;
+        padding: 8px;
+        border: 1px solid #d4d4d8;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 10px;
+        color: #0f172a;
+        max-height: 360px;
+        min-height: 180px;
+        overflow: auto;
+        resize: vertical;
+      }
+
+      .preview-empty {
+        color: #64748b;
+        white-space: pre-wrap;
+      }
+
+      .preview-md-heading {
+        margin: 0 0 8px 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+
+      .preview-md-paragraph {
+        margin: 0 0 8px 0;
+        font-size: 11px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .preview-md-list {
+        margin: 0 0 8px 16px;
+        padding: 0;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+
+      .preview-md-code {
+        margin: 0 0 8px 0;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #d4d4d8;
+        background: #f8fafc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+        white-space: pre-wrap;
+      }
+
+      .preview-inline-code {
+        padding: 1px 4px;
+        border-radius: 4px;
+        border: 1px solid #d4d4d8;
+        background: #f1f5f9;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+      }
+
+      .preview-md-link {
+        color: #1d4ed8;
+        text-decoration: underline;
+      }
+
+      .preview-md-table-wrap {
+        margin: 0 0 8px 0;
+        overflow-x: auto;
+      }
+
+      .preview-md-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .preview-md-table th,
+      .preview-md-table td {
+        border: 0.5px solid #cbd5e1;
+        padding: 4px 6px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .preview-md-table th {
+        background: #f1f5f9;
+        font-weight: 700;
+      }
+
+      .preview-md-divider {
+        border: 0;
+        border-top: 0.5px solid #cbd5e1;
+        margin: 10px 0;
+      }
     </style>
   </head>
   <body>
@@ -145,6 +266,12 @@
       </div>
       <div class="status" id="status-line">Ready</div>
       <div class="result-meta" id="result-line">State: idle</div>
+      <div class="progress-line" id="progress-line">Sync progress: 0%</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="preview-panel">
+        <div class="label">Preview</div>
+        <div class="preview-text" id="preview-text"></div>
+      </div>
       <button class="link-button" id="toggle-details-button" type="button">Show details</button>
       <div class="details" id="details-line" data-open="false"></div>
       <div class="auth-panel" id="auth-panel" data-open="false">
@@ -161,6 +288,26 @@
     </form>
 
     <script>
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "ui-ready",
+          },
+        },
+        "*"
+      );
+
+      window.addEventListener("beforeunload", () => {
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "ui-closed",
+            },
+          },
+          "*"
+        );
+      });
+
       const form = document.getElementById("url-form");
       const input = document.getElementById("url-input");
       const patInput = document.getElementById("pat-input");
@@ -175,9 +322,13 @@
       const authPanel = document.getElementById("auth-panel");
       const authCopy = document.getElementById("auth-copy");
       const authMeta = document.getElementById("auth-meta");
+      const previewText = document.getElementById("preview-text");
+      const progressLine = document.getElementById("progress-line");
+      const progressFill = document.getElementById("progress-fill");
       let activeWidgetId = "active-widget";
       let activeAuthContext = null;
       let detailsOpen = false;
+      let syncProgress = 0;
 
       const AUTH_MESSAGES = {
         MISSING_PAT:
@@ -211,6 +362,234 @@
         const mode = safe.mode || "manual";
         const message = safe.message ? ` · ${safe.message}` : "";
         resultLine.textContent = `State: ${status} (${mode})${message}`;
+      }
+
+      function setSyncProgress(rawPercent) {
+        const percent = Number.isFinite(Number(rawPercent))
+          ? Math.max(0, Math.min(100, Math.round(Number(rawPercent))))
+          : 0;
+        syncProgress = percent;
+        progressLine.textContent = `Sync progress: ${percent}%`;
+        progressFill.style.width = `${percent}%`;
+      }
+
+      function clearNodeChildren(node) {
+        while (node.firstChild) {
+          node.removeChild(node.firstChild);
+        }
+      }
+
+      function appendPreviewNode(tagName, className, text) {
+        const node = document.createElement(tagName);
+        if (className) node.className = className;
+        node.textContent = typeof text === "string" ? text : "";
+        return node;
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function formatInlineMarkdownToHtml(value) {
+        let html = escapeHtml(value);
+        html = html.replace(
+          /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+          '<a class="preview-md-link" href="$2" target="_blank" rel="noreferrer">$1</a>'
+        );
+        html = html.replace(/`([^`]+)`/g, '<code class="preview-inline-code">$1</code>');
+        html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        html = html.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+        html = html.replace(/(^|[^\*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+        html = html.replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
+        html = html.replace(/\n/g, "<br/>");
+        return html;
+      }
+
+      function appendMarkdownNode(tagName, className, text) {
+        const node = document.createElement(tagName);
+        if (className) node.className = className;
+        node.innerHTML = formatInlineMarkdownToHtml(text);
+        return node;
+      }
+
+      function parseMarkdownTableRow(line) {
+        const normalized = String(line || "").trim().replace(/^\|/, "").replace(/\|$/, "");
+        return normalized.split("|").map((cell) => cell.trim());
+      }
+
+      function buildTableNode(content) {
+        const rawLines = String(content || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (rawLines.length < 2) {
+          return appendPreviewNode("pre", "preview-md-code", String(content || ""));
+        }
+
+        const header = parseMarkdownTableRow(rawLines[0]);
+        const rows = rawLines.slice(2).map(parseMarkdownTableRow);
+        const colCount = Math.max(1, header.length);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "preview-md-table-wrap";
+        const table = document.createElement("table");
+        table.className = "preview-md-table";
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        for (let i = 0; i < colCount; i += 1) {
+          const th = document.createElement("th");
+          th.innerHTML = formatInlineMarkdownToHtml(header[i] || "");
+          headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        for (const rowCells of rows) {
+          const tr = document.createElement("tr");
+          for (let i = 0; i < colCount; i += 1) {
+            const td = document.createElement("td");
+            td.innerHTML = formatInlineMarkdownToHtml(rowCells[i] || "");
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        return wrapper;
+      }
+
+      function normalizeListItem(item) {
+        if (item && typeof item === "object") {
+          return {
+            content: String(item.content || ""),
+            depth: Math.max(1, Number(item.depth || 1)),
+          };
+        }
+        return {
+          content: String(item || ""),
+          depth: 1,
+        };
+      }
+
+      function buildNestedListNode(items, ordered) {
+        const listTag = ordered ? "ol" : "ul";
+        const root = document.createElement(listTag);
+        root.className = "preview-md-list";
+        const stack = [{ depth: 1, list: root }];
+
+        for (const rawItem of items) {
+          const current = normalizeListItem(rawItem);
+          let targetDepth = Math.max(1, current.depth);
+
+          while (stack.length > targetDepth) {
+            stack.pop();
+          }
+
+          while (stack.length < targetDepth) {
+            const parent = stack[stack.length - 1].list;
+            let parentLi = parent.lastElementChild;
+            if (!parentLi) {
+              parentLi = document.createElement("li");
+              parent.appendChild(parentLi);
+            }
+
+            const nested = document.createElement(listTag);
+            nested.className = "preview-md-list";
+            parentLi.appendChild(nested);
+            stack.push({ depth: stack.length + 1, list: nested });
+          }
+
+          stack[stack.length - 1].list.appendChild(
+            appendMarkdownNode("li", "", current.content)
+          );
+        }
+
+        return root;
+      }
+
+      function setPreviewContent(payload) {
+        const summary =
+          typeof payload?.previewSummary === "string" ? payload.previewSummary.trim() : "";
+        const previewKind =
+          typeof payload?.previewKind === "string" ? payload.previewKind : "text";
+        const previewBlocks = Array.isArray(payload?.previewBlocks) ? payload.previewBlocks : [];
+
+        clearNodeChildren(previewText);
+
+        if (previewKind === "markdown" && previewBlocks.length > 0) {
+          const fragment = document.createDocumentFragment();
+
+          for (const block of previewBlocks) {
+            const type = typeof block?.type === "string" ? block.type : "text";
+
+            if (type === "heading") {
+              fragment.appendChild(
+                appendMarkdownNode(
+                  "p",
+                  "preview-md-heading",
+                  String(block?.content || "")
+                )
+              );
+              continue;
+            }
+
+            if (type === "paragraph") {
+              fragment.appendChild(
+                appendMarkdownNode(
+                  "p",
+                  "preview-md-paragraph",
+                  String(block?.content || "")
+                )
+              );
+              continue;
+            }
+
+            if (type === "list" && Array.isArray(block?.items)) {
+              fragment.appendChild(buildNestedListNode(block.items, Boolean(block.ordered)));
+              continue;
+            }
+
+            if (type === "divider") {
+              const hr = document.createElement("hr");
+              hr.className = "preview-md-divider";
+              fragment.appendChild(hr);
+              continue;
+            }
+
+            if (type === "table") {
+              fragment.appendChild(buildTableNode(block?.content || ""));
+              continue;
+            }
+
+            if (type === "code" || type === "text" || type === "mermaid") {
+              fragment.appendChild(
+                appendPreviewNode("pre", "preview-md-code", String(block?.content || ""))
+              );
+              continue;
+            }
+
+            fragment.appendChild(
+              appendPreviewNode(
+                "p",
+                "preview-md-paragraph",
+                String(block?.content || "")
+              )
+            );
+          }
+
+          previewText.appendChild(fragment);
+          return;
+        }
+
+        previewText.appendChild(
+          appendPreviewNode("pre", "preview-empty", summary || "No preview yet.")
+        );
       }
 
       function setAuthPanel(open, payload = null) {
@@ -326,6 +705,8 @@
             setStatus("", payload.status);
           }
           setLastResult(payload.lastResult, payload.syncState);
+          setSyncProgress(payload.progressPercent);
+          setPreviewContent(payload);
 
           if (payload.authContext && typeof payload.authContext === "object") {
             setAuthPanel(true, payload.authContext);
@@ -338,6 +719,14 @@
         if (payload.type === "runtime-status") {
           setStatus(payload.level, payload.message, payload.details);
           setLastResult(payload.lastResult, payload.syncState);
+          if (payload.level === "success" && payload.progressPercent == null) {
+            setSyncProgress(100);
+          } else if (payload.level === "error" && payload.progressPercent == null) {
+            setSyncProgress(100);
+          } else {
+            setSyncProgress(payload.progressPercent);
+          }
+          setPreviewContent(payload);
           if (payload.authRequired && typeof payload.sourceKey === "string") {
             setAuthPanel(true, payload);
           } else if (payload.level === "success") {
@@ -346,6 +735,7 @@
         }
       };
 
+      setPreviewContent({});
       updateDetailsVisibility();
     </script>
   </body>
