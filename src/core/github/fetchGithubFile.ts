@@ -14,11 +14,27 @@ function buildGithubContentsApiUrl(source) {
 async function fetchGithubFile(source, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (typeof fetchImpl !== "function") {
-    throw new TypeError("fetch implementation is required.");
+    return {
+      ok: false,
+      status: 0,
+      content: null,
+      body: "fetch implementation is required.",
+      headers: {
+        wwwAuthenticate: "",
+      },
+      request: {
+        url: buildGithubContentsApiUrl(source),
+        tokenUsed: Boolean(options.token),
+      },
+    };
   }
 
   const token = options.token;
   const apiUrl = buildGithubContentsApiUrl(source);
+  const timeoutMs =
+    Number.isFinite(options.timeoutMs) && Number(options.timeoutMs) > 0
+      ? Number(options.timeoutMs)
+      : 12_000;
   const headers = {
     accept: "application/vnd.github.raw+json",
   };
@@ -28,10 +44,38 @@ async function fetchGithubFile(source, options = {}) {
   }
 
   try {
-    const response = await fetchImpl(apiUrl, {
-      method: "GET",
-      headers,
+    let timeoutId = null;
+    const timeoutPromise = new Promise((resolve) => {
+      timeoutId = setTimeout(() => resolve({ __timedOut: true }), timeoutMs);
     });
+    const responseOrTimeout = await Promise.race([
+      fetchImpl(apiUrl, {
+        method: "GET",
+        headers,
+      }),
+      timeoutPromise,
+    ]);
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+
+    if (responseOrTimeout && responseOrTimeout.__timedOut) {
+      return {
+        ok: false,
+        status: 0,
+        content: null,
+        body: `Request timeout after ${timeoutMs}ms`,
+        headers: {
+          wwwAuthenticate: "",
+        },
+        request: {
+          url: apiUrl,
+          tokenUsed: Boolean(token),
+        },
+      };
+    }
+
+    const response = responseOrTimeout;
 
     const body = await response.text();
     return {

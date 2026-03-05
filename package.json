@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "node --test",
+    "test": "node scripts/test.cjs",
     "typecheck": "node scripts/typecheck.cjs",
     "widget:build": "node scripts/widget-build.cjs",
     "widget:check": "node scripts/widget-check.cjs"

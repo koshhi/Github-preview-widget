@@ -9,6 +9,26 @@ function isTableDivider(line) {
   return /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(line.trim());
 }
 
+function isListLine(line) {
+  return /^\s*(?:[-*+]|\d+\.)\s+/.test(String(line || ""));
+}
+
+function getListDepth(rawLine) {
+  const leading = String(rawLine || "")
+    .match(/^\s*/)?.[0]
+    ?.replace(/\t/g, "  ").length || 0;
+  return Math.max(1, Math.floor(leading / 2) + 1);
+}
+
+function stripListMarker(rawLine) {
+  return String(rawLine || "").replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim();
+}
+
+function isHorizontalRuleLine(line) {
+  const trimmed = String(line || "").trim();
+  return /^([-*_])(?:\s*\1){2,}$/.test(trimmed);
+}
+
 function parseMarkdownBlocks(markdown) {
   const lines = String(markdown || "").split(/\r?\n/);
   const blocks = [];
@@ -57,15 +77,27 @@ function parseMarkdownBlocks(markdown) {
       continue;
     }
 
-    if (/^[-*+]\s+/.test(trimmed)) {
+    if (isHorizontalRuleLine(trimmed)) {
+      blocks.push({
+        type: "divider",
+      });
+      index += 1;
+      continue;
+    }
+
+    if (isListLine(line)) {
+      const ordered = /^\s*\d+\.\s+/.test(line);
       const items = [];
-      while (index < lines.length && /^[-*+]\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().slice(2));
+      while (index < lines.length && isListLine(lines[index])) {
+        items.push({
+          content: stripListMarker(lines[index]),
+          depth: getListDepth(lines[index]),
+        });
         index += 1;
       }
       blocks.push({
         type: "list",
-        ordered: false,
+        ordered,
         items,
       });
       continue;
@@ -93,14 +125,14 @@ function parseMarkdownBlocks(markdown) {
       lines[index].trim() &&
       !lines[index].trim().startsWith("```") &&
       !/^#{1,6}\s+/.test(lines[index].trim()) &&
-      !/^[-*+]\s+/.test(lines[index].trim()) &&
+      !isListLine(lines[index]) &&
       !(lines[index].includes("|") && isTableDivider(lines[index + 1] || ""))
     ) {
       paragraphLines.push(lines[index]);
       index += 1;
     }
 
-    const paragraph = paragraphLines.join(" ").trim();
+    const paragraph = paragraphLines.join("\n").trim();
     blocks.push({
       type: "paragraph",
       content: paragraph,

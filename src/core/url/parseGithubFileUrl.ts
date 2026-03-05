@@ -76,28 +76,51 @@ function parseRawPath(urlObj) {
   };
 }
 
+function parseHttpsUrl(inputUrl) {
+  const trimmed = String(inputUrl || "").trim();
+  const schemeMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);
+
+  if (schemeMatch && schemeMatch[1].toLowerCase() !== "https") {
+    return parseError(URL_ERROR_CODES.UNSUPPORTED_ROUTE, "Only HTTPS URLs are supported.");
+  }
+
+  const match = trimmed.match(/^https:\/\/([^/?#]+)(\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i);
+  if (!match) {
+    return parseError(URL_ERROR_CODES.INVALID_FORMAT, "Invalid URL format.");
+  }
+
+  const hostname = String(match[1] || "").toLowerCase();
+  const pathname = match[2] && match[2].length > 0 ? match[2] : "/";
+
+  if (!hostname) {
+    return parseError(URL_ERROR_CODES.INVALID_FORMAT, "Invalid URL host.");
+  }
+
+  return {
+    ok: true,
+    value: {
+      hostname,
+      pathname,
+    },
+  };
+}
+
 function parseGithubFileUrl(inputUrl) {
   if (typeof inputUrl !== "string" || inputUrl.trim() === "") {
     return parseError(URL_ERROR_CODES.INVALID_FORMAT, "URL must be a non-empty string.");
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(inputUrl);
-  } catch (error) {
-    return parseError(URL_ERROR_CODES.INVALID_FORMAT, `Invalid URL: ${error.message}`);
+  const parsedUrl = parseHttpsUrl(inputUrl);
+  if (!parsedUrl.ok) {
+    return parsedUrl;
   }
 
-  if (parsedUrl.protocol !== "https:") {
-    return parseError(URL_ERROR_CODES.UNSUPPORTED_ROUTE, "Only HTTPS URLs are supported.");
+  if (parsedUrl.value.hostname === "github.com") {
+    return parseBlobPath(parsedUrl.value);
   }
 
-  if (parsedUrl.hostname === "github.com") {
-    return parseBlobPath(parsedUrl);
-  }
-
-  if (parsedUrl.hostname === "raw.githubusercontent.com") {
-    return parseRawPath(parsedUrl);
+  if (parsedUrl.value.hostname === "raw.githubusercontent.com") {
+    return parseRawPath(parsedUrl.value);
   }
 
   return parseError(

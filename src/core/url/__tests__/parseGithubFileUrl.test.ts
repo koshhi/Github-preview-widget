@@ -61,3 +61,16 @@ test("returns invalid format error for malformed url", () => {
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "INVALID_FORMAT");
 });
+
+test("supports blob URL with query/hash fragments", () => {
+  const result = parseGithubFileUrl(
+    "https://github.com/octocat/hello-world/blob/main/docs/spec.md?plain=1#L10"
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.sourceType, "blob");
+  assert.equal(result.value.owner, "octocat");
+  assert.equal(result.value.repo, "hello-world");
+  assert.equal(result.value.ref, "main");
+  assert.equal(result.value.path, "docs/spec.md");
+});

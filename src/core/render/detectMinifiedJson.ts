@@ -1,3 +1,5 @@
+const { byteLengthUtf8 } = require("./utf8ByteLength.ts");
+
 function detectMinifiedJson(content, options = {}) {
   if (typeof content !== "string") {
     return { isMinified: false, reason: "not_string" };
@@ -13,7 +15,7 @@ function detectMinifiedJson(content, options = {}) {
   }
 
   const maxBytesForPrettyPrint = Number(options.maxBytesForPrettyPrint || 250 * 1024);
-  const bytes = Buffer.byteLength(trimmed, "utf8");
+  const bytes = byteLengthUtf8(trimmed);
   if (bytes > maxBytesForPrettyPrint) {
     return { isMinified: false, reason: "too_large_for_pretty_print" };
   }
