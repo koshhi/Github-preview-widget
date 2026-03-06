@@ -3,7 +3,7 @@
 **Milestone:** v1.1 Real Widget Runtime
 **Created:** 2026-03-03
 **Depth:** quick
-**Total phases:** 4
+**Total phases:** 5
 **Total v1.1 requirements mapped:** 13/13
 
 ## Overview
@@ -14,6 +14,7 @@
 | 6 | End-to-End Widget Rendering | Complete (2026-03-03) | WDG-03, INT-04, INT-05 | 4 |
 | 7 | Private Access & PAT Safety | Complete (2026-03-03) | SEC-01, SEC-02, SEC-03 | 4 |
 | 8 | Sync, UAT & Docs | Complete (2026-03-03) | SNC-07, SNC-08, SNC-09, QLT-05 | 5 |
+| 9 | GFM Canvas Preview Fidelity | In Verification | GFM-01, GFM-02, UIF-01, STB-01, REG-01 | 5 |
 
 ## Phase 5: Widget Runtime Bootstrap
 
@@ -84,5 +85,30 @@
 - Unmapped: 0
 - Duplicate mapping: 0
 
+### Phase 9: Actualizar el canvas preview del fichero markdown usando Github Flavoured Markdown o un estilo matcheado al 100%
+
+**Goal:** Conseguir preview de canvas con fidelidad GFM y estilo alineado a Figma sin comprometer estabilidad del runtime del widget.
+
+**Requirements:**
+- GFM-01
+- GFM-02
+- UIF-01
+- STB-01
+- REG-01
+
+**Success criteria:**
+1. Parsing/render mantiene semántica GFM consistente para bloques soportados en modal y canvas.
+2. Canvas preview se actualiza en create/refresh sin crash runtime (`undefined`) en los escenarios de prueba de fase.
+3. Estado vacío cumple copy y tamaño acordados (`Set a GitHub URL to preview the document or file.` y 100px sin URL).
+4. El widget completo mantiene comportamiento de alto por contenido (`hug content`) y estilo visual objetivo.
+5. Existe cobertura de regresión y checklist UAT de fase 9 para validar fidelidad + estabilidad.
+
+**Depends on:** Phase 8
+**Plans:** 1/1 plans executed
+**Verification:** human_needed (`09-VERIFICATION.md`)
+
+Plans:
+- [x] 09-01 - GFM Canvas Preview Fidelity and Runtime Stability (executed 2026-03-06)
+
 ---
-*Last updated: 2026-03-03 after phase 8 execution*
+*Last updated: 2026-03-06 after phase 9 execution (awaiting human verification)*

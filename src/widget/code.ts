@@ -47,34 +47,35 @@ const PROPERTY_ACTION = Object.freeze({
   REFRESH_NOW: "refresh_now",
   WIDTH_DEC: "width_dec",
   WIDTH_INC: "width_inc",
-  HEIGHT_DEC: "height_dec",
-  HEIGHT_INC: "height_inc",
 });
 
 const syncCoordinator = createSyncCoordinator({ cooldownMs: 60_000 });
 
 const CANVAS_SIZE_LIMITS = Object.freeze({
-  minWidth: 320,
+  minWidth: 360,
   maxWidth: 1800,
-  minHeight: 220,
-  maxHeight: 2200,
-  defaultWidth: 760,
-  defaultHeight: 920,
-  widthStep: 120,
-  heightStep: 120,
+  defaultWidth: 672,
+  widthStep: 80,
 });
 
 const CANVAS_LAYOUT = Object.freeze({
   root: {
-    spacing: 8,
+    spacing: 12,
     padding: 12,
     cornerRadius: 8,
   },
-  previewPanel: {
+  header: {
     spacing: 8,
-    padding: 12,
-    cornerRadius: 8,
-    insetHorizontal: 16,
+    padding: 0,
+    cornerRadius: 0,
+  },
+  previewPanel: {
+    spacing: 10,
+    padding: 16,
+    cornerRadius: 6,
+    insetHorizontal: 0,
+    renderBudgetHeight: 960,
+    emptyStateHeight: 100,
   },
   divider: {
     thickness: 1,
@@ -152,16 +153,14 @@ function openWidgetUi() {
     visible: true,
   });
 
-  const uiVisible =
-    figma.ui && typeof figma.ui.visible === "boolean" ? String(figma.ui.visible) : "unknown";
-  figma.notify(`UI visible: ${uiVisible}`);
-
   const openNonce = ++lastUiOpenNonce;
   setTimeout(() => {
     if (lastUiReadyNonce < openNonce) {
       figma.notify("UI opened but did not initialize.", { error: true });
     }
   }, 900);
+
+  return true;
 }
 
 function deriveSourceKey(url, embedBlock, embedSnapshot, authContext) {
@@ -224,12 +223,20 @@ function readListItem(listItem) {
     return {
       content: String(listItem.content || ""),
       depth: Math.max(1, Number(listItem.depth || 1)),
+      ordered:
+        typeof listItem.ordered === "boolean" ? listItem.ordered : undefined,
+      task:
+        listItem.task && typeof listItem.task === "object"
+          ? { checked: Boolean(listItem.task.checked) }
+          : null,
     };
   }
 
   return {
     content: String(listItem || ""),
     depth: 1,
+    ordered: undefined,
+    task: null,
   };
 }
 
@@ -259,14 +266,28 @@ function toPreviewLines(blocks, options = {}) {
       continue;
     }
 
+    if (type === "blockquote") {
+      const lines = splitLines(String(block.content || ""), 2, maxCharsPerLine - 2);
+      out.push(...lines.map((line) => `> ${line}`));
+      continue;
+    }
+
     if (type === "list" && Array.isArray(block.items)) {
       const orderedCounters = {};
       for (const item of block.items.slice(0, 3)) {
         if (out.length >= maxLines) break;
         const normalized = readListItem(item);
         const indent = "  ".repeat(Math.max(0, normalized.depth - 1));
-        let prefix = listBulletForDepth(normalized.depth);
-        if (block.ordered) {
+        const ordered =
+          typeof normalized.ordered === "boolean"
+            ? normalized.ordered
+            : Boolean(block.ordered);
+        let prefix = normalized.task
+          ? normalized.task.checked
+            ? "[x]"
+            : "[ ]"
+          : listBulletForDepth(normalized.depth);
+        if (!normalized.task && ordered) {
           orderedCounters[normalized.depth] = (orderedCounters[normalized.depth] || 0) + 1;
           for (const depthKey of Object.keys(orderedCounters)) {
             if (Number(depthKey) > normalized.depth) {
@@ -327,6 +348,13 @@ function buildUiPreviewTextFromBlock(block, options = {}) {
     Number.isFinite(Number(options.maxChars)) && Number(options.maxChars) > 0
       ? Number(options.maxChars)
       : 200_000;
+  if (typeof block?.previewSummary === "string" && block.previewSummary.trim()) {
+    const directText = block.previewSummary.trim();
+    if (directText.length > maxChars) {
+      return `${directText.slice(0, maxChars)}\n\n[preview truncated in UI]`;
+    }
+    return directText;
+  }
   const parts = [];
   const blocks = Array.isArray(block?.preview?.blocks) ? block.preview.blocks : [];
 
@@ -343,13 +371,26 @@ function buildUiPreviewTextFromBlock(block, options = {}) {
       continue;
     }
 
+    if (type === "blockquote") {
+      parts.push(`> ${String(item.content || "")}`);
+      continue;
+    }
+
     if (type === "list" && Array.isArray(item.items)) {
       const orderedCounters = {};
       for (const entry of item.items) {
         const normalized = readListItem(entry);
         const indent = "  ".repeat(Math.max(0, normalized.depth - 1));
-        let prefix = listBulletForDepth(normalized.depth);
-        if (item.ordered) {
+        const ordered =
+          typeof normalized.ordered === "boolean"
+            ? normalized.ordered
+            : Boolean(item.ordered);
+        let prefix = normalized.task
+          ? normalized.task.checked
+            ? "[x]"
+            : "[ ]"
+          : listBulletForDepth(normalized.depth);
+        if (!normalized.task && ordered) {
           orderedCounters[normalized.depth] = (orderedCounters[normalized.depth] || 0) + 1;
           for (const depthKey of Object.keys(orderedCounters)) {
             if (Number(depthKey) > normalized.depth) {
@@ -412,16 +453,7 @@ function clampCanvasSize(input = {}) {
       Math.min(CANVAS_SIZE_LIMITS.maxWidth, toNumberOrFallback(input.width, CANVAS_SIZE_LIMITS.defaultWidth))
     )
   );
-  const height = Math.round(
-    Math.max(
-      CANVAS_SIZE_LIMITS.minHeight,
-      Math.min(
-        CANVAS_SIZE_LIMITS.maxHeight,
-        toNumberOrFallback(input.height, CANVAS_SIZE_LIMITS.defaultHeight)
-      )
-    )
-  );
-  return { width, height };
+  return { width };
 }
 
 function fitPreviewTextForCanvas(inputText, options = {}) {
@@ -429,7 +461,7 @@ function fitPreviewTextForCanvas(inputText, options = {}) {
   if (!text) return "";
 
   const width = Math.max(180, Number(options.width || CANVAS_SIZE_LIMITS.defaultWidth));
-  const height = Math.max(120, Number(options.height || CANVAS_SIZE_LIMITS.defaultHeight));
+  const height = Math.max(120, Number(options.height || CANVAS_LAYOUT.previewPanel.renderBudgetHeight));
   const charsPerLine = Math.max(28, Math.floor((width - 48) / 6.2));
   const maxLines = Math.max(8, Math.floor((height - 24) / 14));
   const sourceLines = text.split(/\r?\n/);
@@ -460,21 +492,529 @@ function fitPreviewTextForCanvas(inputText, options = {}) {
 
 function buildUiPreviewPayload(block) {
   const preview = block?.preview || {};
+  const directSummary =
+    typeof block?.previewSummary === "string" ? block.previewSummary.trim() : "";
+  const directBlocks =
+    directSummary.length > 0
+      ? [
+        {
+          type: "text",
+          language: "txt",
+          content: directSummary,
+        },
+      ]
+      : [];
+  const previewBlocks = Array.isArray(preview.blocks) ? preview.blocks : directBlocks;
   return {
     previewKind: typeof preview.kind === "string" && preview.kind ? preview.kind : "text",
-    previewBlocks: Array.isArray(preview.blocks) ? preview.blocks : [],
+    previewBlocks,
   };
+}
+
+function jsonCloneSafe(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function toSafeString(value, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function parseInlineMarkdownSegments(value) {
+  const input = String(value || "");
+  if (!input) {
+    return [];
+  }
+
+  const source = input.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, "$1");
+  const tokenPattern =
+    /(\*\*\*[^*\n]+?\*\*\*|___[^_\n]+?___|\*\*_[^_\n]+?_\*\*|__\*[^*\n]+?\*__|\*\*[^*\n]+?\*\*|__[^_\n]+?__|\*[^*\n]+?\*|_[^_\n]+?_|`[^`]+`|\[[^\]]+\]\(([^)\s]+)(?:\s+"[^"]*")?\)|<((?:https?:\/\/|mailto:)[^>\s]+)>|https?:\/\/[^\s<)]+)/g;
+
+  const segments = [];
+  let cursor = 0;
+
+  function pushSegment(text, style = {}) {
+    const normalized = String(text || "");
+    if (!normalized) {
+      return;
+    }
+
+    const last = segments[segments.length - 1];
+    if (
+      last &&
+      Boolean(last.bold) === Boolean(style.bold) &&
+      Boolean(last.italic) === Boolean(style.italic) &&
+      Boolean(last.link) === Boolean(style.link)
+    ) {
+      last.text += normalized;
+      return;
+    }
+
+    segments.push({
+      text: normalized,
+      bold: Boolean(style.bold),
+      italic: Boolean(style.italic),
+      link: Boolean(style.link),
+    });
+  }
+
+  let match;
+  while ((match = tokenPattern.exec(source)) !== null) {
+    if (match.index > cursor) {
+      pushSegment(source.slice(cursor, match.index));
+    }
+
+    const token = String(match[0] || "");
+    if (!token) {
+      cursor = match.index + 1;
+      continue;
+    }
+
+    if ((token.startsWith("***") && token.endsWith("***")) || (token.startsWith("___") && token.endsWith("___"))) {
+      pushSegment(token.slice(3, -3), { bold: true, italic: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    if ((token.startsWith("**_") && token.endsWith("_**")) || (token.startsWith("__*") && token.endsWith("*__"))) {
+      pushSegment(token.slice(3, -3), { bold: true, italic: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    if ((token.startsWith("**") && token.endsWith("**")) || (token.startsWith("__") && token.endsWith("__"))) {
+      pushSegment(token.slice(2, -2), { bold: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    if ((token.startsWith("*") && token.endsWith("*")) || (token.startsWith("_") && token.endsWith("_"))) {
+      pushSegment(token.slice(1, -1), { italic: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    if (token.startsWith("`") && token.endsWith("`")) {
+      pushSegment(token.slice(1, -1));
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    const markdownLink = token.match(/^\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
+    if (markdownLink) {
+      pushSegment(markdownLink[1], { link: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    const autoLink = token.match(/^<((?:https?:\/\/|mailto:)[^>\s]+)>$/);
+    if (autoLink) {
+      pushSegment(autoLink[1], { link: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    if (/^https?:\/\//.test(token)) {
+      pushSegment(token, { link: true });
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    pushSegment(token);
+    cursor = tokenPattern.lastIndex;
+  }
+
+  if (cursor < source.length) {
+    pushSegment(source.slice(cursor));
+  }
+
+  return segments
+    .map((segment) => ({
+      ...segment,
+      text: segment.text.replace(/<\/?[^>]+>/g, ""),
+    }))
+    .filter((segment) => segment.text.length > 0);
+}
+
+function wrapInlineSegmentsForCanvas(segments, maxCharsPerLine, maxUnits) {
+  const lines = [];
+  let currentLine = [];
+  let currentLen = 0;
+
+  const isAttachPunctuation = (value) => /^[.,;:!?%)\]]+$/.test(String(value || ""));
+
+  const flushLine = () => {
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    currentLine = [];
+    currentLen = 0;
+  };
+
+  const appendToken = (tokenText, style) => {
+    const text = String(tokenText || "");
+    if (!text) return;
+
+    const last = currentLine[currentLine.length - 1];
+    if (last && isAttachPunctuation(text)) {
+      last.text += text;
+      currentLen += text.length;
+      return;
+    }
+
+    if (
+      last &&
+      Boolean(last.bold) === Boolean(style.bold) &&
+      Boolean(last.italic) === Boolean(style.italic) &&
+      Boolean(last.link) === Boolean(style.link)
+    ) {
+      last.text += text;
+    } else {
+      currentLine.push({
+        text,
+        bold: Boolean(style.bold),
+        italic: Boolean(style.italic),
+        link: Boolean(style.link),
+      });
+    }
+    currentLen += text.length;
+  };
+
+  const normalizedWidth = Math.max(12, Number(maxCharsPerLine || 72));
+  const normalizedMaxUnits = Math.max(1, Number(maxUnits || 1));
+
+  for (const segment of Array.isArray(segments) ? segments : []) {
+    const tokens = String(segment.text || "").split(/(\s+)/g);
+    for (const rawToken of tokens) {
+      if (!rawToken) continue;
+      const token = String(rawToken);
+      if (!token.trim()) {
+        const last = currentLine[currentLine.length - 1];
+        if (last && !/\s$/.test(last.text)) {
+          last.text += " ";
+          currentLen += 1;
+        }
+        continue;
+      }
+
+      let remaining = token;
+      while (remaining.length > 0) {
+        if (lines.length >= normalizedMaxUnits) {
+          break;
+        }
+
+        const available = Math.max(1, normalizedWidth - currentLen);
+        if (remaining.length <= available) {
+          appendToken(remaining, segment);
+          remaining = "";
+          continue;
+        }
+
+        if (currentLen > 0) {
+          flushLine();
+          if (lines.length >= normalizedMaxUnits) {
+            break;
+          }
+          continue;
+        }
+
+        appendToken(remaining.slice(0, available), segment);
+        remaining = remaining.slice(available);
+        flushLine();
+      }
+    }
+  }
+
+  flushLine();
+
+  const clamped = lines.slice(0, normalizedMaxUnits).map((line) => {
+    const joined = line.map((segment) => segment.text).join("");
+    if (joined.trim().length === 0) {
+      return [];
+    }
+    return line;
+  });
+
+  return clamped.filter((line) => line.length > 0);
+}
+
+function sanitizeCanvasText(value, maxChars = 1800) {
+  const text = String(value || "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/\r/g, "");
+
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+const CANVAS_SAFE_LIMITS = Object.freeze({
+  maxBlocks: 24,
+  maxListItems: 36,
+  maxListDepth: 5,
+  headingChars: 220,
+  paragraphChars: 900,
+  quoteChars: 900,
+  listItemChars: 320,
+  tableChars: 1600,
+  codeChars: 1600,
+  genericChars: 900,
+  languageChars: 24,
+});
+
+function toCanvasSafeListItems(items, orderedFallback) {
+  const out = [];
+  const source = Array.isArray(items) ? items.slice(0, CANVAS_SAFE_LIMITS.maxListItems) : [];
+  for (const item of source) {
+    const normalized = readListItem(item);
+    const depth = Math.max(
+      1,
+      Math.min(CANVAS_SAFE_LIMITS.maxListDepth, Number(normalized.depth || 1))
+    );
+    const content = sanitizeCanvasText(normalized.content || "", CANVAS_SAFE_LIMITS.listItemChars);
+    if (!content) {
+      continue;
+    }
+    out.push({
+      content,
+      depth,
+      ordered:
+        typeof normalized.ordered === "boolean"
+          ? normalized.ordered
+          : Boolean(orderedFallback),
+      task:
+        normalized.task && typeof normalized.task === "object"
+          ? { checked: Boolean(normalized.task.checked) }
+          : undefined,
+    });
+  }
+  return out;
+}
+
+function toCanvasSafePreviewBlocks(previewBlocks) {
+  const safe = [];
+  const source = Array.isArray(previewBlocks) ? previewBlocks : [];
+
+  for (const raw of source.slice(0, CANVAS_SAFE_LIMITS.maxBlocks)) {
+    const type = typeof raw?.type === "string" ? raw.type : "paragraph";
+
+    if (type === "divider") {
+      safe.push({ type: "divider" });
+      continue;
+    }
+
+    if (type === "heading") {
+      const content = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.headingChars);
+      if (content) {
+        safe.push({
+          type: "heading",
+          depth: Math.max(1, Math.min(6, Number(raw?.depth || 1))),
+          content,
+        });
+      }
+      continue;
+    }
+
+    if (type === "paragraph") {
+      const content = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.paragraphChars);
+      if (content) {
+        safe.push({ type: "paragraph", content });
+      }
+      continue;
+    }
+
+    if (type === "blockquote") {
+      const content = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.quoteChars);
+      if (content) {
+        safe.push({ type: "blockquote", content });
+      }
+      continue;
+    }
+
+    if (type === "list") {
+      const ordered = Boolean(raw?.ordered);
+      const items = toCanvasSafeListItems(raw?.items, ordered);
+      if (items.length > 0) {
+        safe.push({
+          type: "list",
+          ordered,
+          start:
+            Number.isFinite(Number(raw?.start)) && Number(raw.start) > 0
+              ? Number(raw.start)
+              : 1,
+          items,
+        });
+      }
+      continue;
+    }
+
+    if (type === "table") {
+      const content = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.tableChars);
+      if (content) {
+        safe.push({ type: "table", content });
+      }
+      continue;
+    }
+
+    if (type === "code" || type === "text" || type === "mermaid") {
+      const content = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.codeChars);
+      if (content) {
+        const language = sanitizeCanvasText(
+          String(raw?.language || (type === "mermaid" ? "mermaid" : "txt")).toLowerCase(),
+          CANVAS_SAFE_LIMITS.languageChars
+        );
+        safe.push({
+          type: "code",
+          language: language || "txt",
+          content,
+        });
+      }
+      continue;
+    }
+
+    const fallback = sanitizeCanvasText(raw?.content || "", CANVAS_SAFE_LIMITS.genericChars);
+    if (fallback) {
+      safe.push({ type: "paragraph", content: fallback });
+    }
+  }
+
+  return safe;
+}
+
+function toCanvasSafeEmbedBlock(block) {
+  if (!block || typeof block !== "object") {
+    return null;
+  }
+
+  const source = block.source && typeof block.source === "object" ? block.source : {};
+  const sync = block.sync && typeof block.sync === "object" ? block.sync : {};
+  const safePreviewBlocks = toCanvasSafePreviewBlocks(block?.preview?.blocks);
+  const previewKind =
+    typeof block?.preview?.kind === "string" && block.preview.kind
+      ? block.preview.kind
+      : safePreviewBlocks.length > 0
+        ? "markdown"
+        : "text";
+  const fallbackSummary = buildPreviewSummaryFromBlock(block, {
+    maxLines: 28,
+    maxCharsPerLine: 96,
+  });
+  const summary = sanitizeCanvasText(
+    buildUiPreviewTextFromBlock(block, {
+      maxChars: 2_200,
+    }),
+    1_800
+  );
+  const finalSummary = summary || sanitizeCanvasText(fallbackSummary, 1_000);
+  const safeWarnings = Array.isArray(block?.preview?.warnings)
+    ? block.preview.warnings
+        .filter((item) => typeof item === "string" && item.trim())
+        .slice(0, 8)
+    : [];
+
+  return jsonCloneSafe({
+    sourceKey: toSafeString(block.sourceKey, ""),
+    source: {
+      owner: toSafeString(source.owner, "unknown"),
+      repo: toSafeString(source.repo, "unknown"),
+      ref: toSafeString(source.ref, "main"),
+      path: toSafeString(source.path, "FileName.md"),
+    },
+    previewSummary: finalSummary,
+    preview: {
+      kind: previewKind,
+      blocks: safePreviewBlocks,
+      warnings: safeWarnings,
+      truncated: Boolean(block?.preview?.truncated),
+      progressive: Boolean(block?.preview?.progressive),
+    },
+    sync: {
+      status: toSafeString(sync.status, "idle"),
+      mode: toSafeString(sync.mode, "manual"),
+      lastSyncAt: sync.lastSyncAt || null,
+      message: toSafeString(sync.message, ""),
+      details: toSafeString(sync.details, ""),
+      lastUpdatedAt: toSafeString(sync.lastUpdatedAt, new Date().toISOString()),
+    },
+    updatedAt: toSafeString(block.updatedAt, new Date().toISOString()),
+  }, null);
+}
+
+function toCanvasSafeSnapshot(snapshot, block) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return {
+      sourceKey: toSafeString(block?.sourceKey, ""),
+      sourceUrl: "",
+      syncState: toSafeString(block?.sync?.status, "idle"),
+      warningCount: 0,
+      lastResult: buildLastResult(null, block || null),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const lastResult = buildLastResult(snapshot, block || null);
+  return jsonCloneSafe(
+    {
+      sourceKey: toSafeString(snapshot.sourceKey, toSafeString(block?.sourceKey, "")),
+      sourceUrl: toSafeString(snapshot.sourceUrl, ""),
+      syncState: toSafeString(snapshot.syncState, toSafeString(lastResult.status, "idle")),
+      warningCount: Number(snapshot.warningCount || 0),
+      lastResult,
+      updatedAt: toSafeString(snapshot.updatedAt, new Date().toISOString()),
+    },
+    {
+      sourceKey: toSafeString(block?.sourceKey, ""),
+      sourceUrl: "",
+      syncState: "idle",
+      warningCount: 0,
+      lastResult,
+      updatedAt: new Date().toISOString(),
+    }
+  );
 }
 
 function stripInlineMarkdown(value) {
   let text = String(value || "");
-  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1");
-  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, "$1");
+  text = text.replace(/<((?:https?:\/\/|mailto:)[^>\s]+)>/g, "$1");
   text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
   text = text.replace(/__([^_]+)__/g, "$1");
   text = text.replace(/\*([^*\n]+)\*/g, "$1");
   text = text.replace(/_([^_\n]+)_/g, "$1");
+  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text.replace(/~~([^~]+)~~/g, "$1");
+  text = text.replace(/<\/?[^>]+>/g, "");
   return text;
+}
+
+function extractStandaloneMarkdownLink(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/^\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/);
+  if (!match) {
+    return null;
+  }
+
+  const label = String(match[1] || "").trim();
+  const href = String(match[2] || "").trim();
+  if (!label || !href) {
+    return null;
+  }
+
+  return { label, href };
+}
+
+function estimateCanvasPreviewBudgetHeight(blocks) {
+  const blockCount = Math.max(1, Array.isArray(blocks) ? blocks.length : 0);
+  return Math.max(
+    520,
+    Math.min(2200, 220 + blockCount * 38)
+  );
 }
 
 function parseCanvasTable(content, options = {}) {
@@ -525,12 +1065,57 @@ function estimateCanvasUnitsFromText(text, charsPerLine) {
   return Math.max(1, units);
 }
 
+function clampCanvasTextContent(rawText, charsPerLine, maxUnits) {
+  const input = String(rawText || "");
+  if (!input || maxUnits <= 0) {
+    return { text: "", units: 0 };
+  }
+
+  const maxChars = Math.max(16, charsPerLine);
+  const sourceLines = input.split(/\r?\n/g);
+  const out = [];
+  let usedUnits = 0;
+
+  for (const rawLine of sourceLines) {
+    if (usedUnits >= maxUnits) {
+      break;
+    }
+
+    const line = String(rawLine || "");
+    if (!line.length) {
+      out.push("");
+      usedUnits += 1;
+      continue;
+    }
+
+    let cursor = 0;
+    while (cursor < line.length && usedUnits < maxUnits) {
+      out.push(line.slice(cursor, cursor + maxChars));
+      cursor += maxChars;
+      usedUnits += 1;
+    }
+  }
+
+  const wasTruncated = estimateCanvasUnitsFromText(input, charsPerLine) > usedUnits;
+  if (wasTruncated && out.length > 0) {
+    const lastIndex = out.length - 1;
+    out[lastIndex] = clampText(out[lastIndex], Math.max(1, maxChars - 1));
+    out[lastIndex] = `${out[lastIndex]}…`;
+  }
+
+  const text = out.join("\n").trimEnd();
+  return {
+    text,
+    units: Math.max(1, out.length || 1),
+  };
+}
+
 function buildCanvasPreviewEntries(blocks, options = {}) {
   const sourceBlocks = Array.isArray(blocks) ? blocks : [];
   if (!sourceBlocks.length) return [];
 
   const width = Math.max(180, Number(options.width || CANVAS_SIZE_LIMITS.defaultWidth));
-  const height = Math.max(120, Number(options.height || CANVAS_SIZE_LIMITS.defaultHeight));
+  const height = Math.max(120, Number(options.height || CANVAS_LAYOUT.previewPanel.renderBudgetHeight));
   const charsPerLine = Math.max(24, Math.floor((width - 20) / 6.2));
   const maxUnits = Math.max(24, Math.floor(height / 14) * 2);
   const out = [];
@@ -551,15 +1136,99 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
     const type = typeof block?.type === "string" ? block.type : "text";
 
     if (type === "heading") {
+      const depth = Math.max(1, Math.min(6, Number(block.depth || 1)));
       const text = stripInlineMarkdown(block.content || "");
+      const remainingUnits = Math.max(1, maxUnits - usedUnits);
+      const clamped = clampCanvasTextContent(text, charsPerLine, remainingUnits);
+      if (!clamped.text) {
+        break;
+      }
+
+      const headingStyles = {
+        1: { fontSize: 30, fontWeight: 700 },
+        2: { fontSize: 24, fontWeight: 700 },
+        3: { fontSize: 20, fontWeight: 700 },
+        4: { fontSize: 16, fontWeight: 700 },
+        5: { fontSize: 14, fontWeight: 700 },
+        6: { fontSize: 12, fontWeight: 600 },
+      };
+
       if (
         !pushEntry(
           {
             type: "text",
-            text,
-            style: { fontSize: 11, fontWeight: 700, fill: "#111827" },
+            text: clamped.text,
+            style: {
+              ...(headingStyles[depth] || headingStyles[6]),
+              fill: depth >= 6 ? "#57606A" : "#1F2328",
+            },
           },
-          estimateCanvasUnitsFromText(text, charsPerLine)
+          clamped.units
+        )
+      ) {
+        break;
+      }
+
+      if (depth <= 2 && usedUnits < maxUnits) {
+        if (
+          !pushEntry(
+            {
+              type: "divider",
+            },
+            1
+          )
+        ) {
+          break;
+        }
+      }
+      continue;
+    }
+
+    if (type === "paragraph") {
+      const markdownText = String(block.content || "");
+      const standaloneLink = extractStandaloneMarkdownLink(markdownText);
+      const segments = parseInlineMarkdownSegments(markdownText);
+      const remainingUnits = Math.max(1, maxUnits - usedUnits);
+      const richLines = wrapInlineSegmentsForCanvas(
+        segments,
+        charsPerLine,
+        remainingUnits
+      );
+      if (richLines.length > 0) {
+        if (
+          !pushEntry(
+            {
+              type: "richtext",
+              lines: richLines,
+              style: {
+                fontSize: 11,
+                fill: "#1F2328",
+              },
+            },
+            richLines.length
+          )
+        ) {
+          break;
+        }
+        continue;
+      }
+
+      const text = standaloneLink ? standaloneLink.label : stripInlineMarkdown(markdownText);
+      const clamped = clampCanvasTextContent(text, charsPerLine, remainingUnits);
+      if (!clamped.text) {
+        break;
+      }
+      if (
+        !pushEntry(
+          {
+            type: "text",
+            text: clamped.text,
+            style: {
+              fontSize: 11,
+              fill: standaloneLink ? "#0969DA" : "#1F2328",
+            },
+          },
+          clamped.units
         )
       ) {
         break;
@@ -567,16 +1236,22 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
       continue;
     }
 
-    if (type === "paragraph") {
-      const text = stripInlineMarkdown(block.content || "");
+    if (type === "blockquote") {
+      const quote = stripInlineMarkdown(block.content || "");
+      const text = quote || "";
+      const remainingUnits = Math.max(1, maxUnits - usedUnits);
+      const clamped = clampCanvasTextContent(text, charsPerLine, remainingUnits);
+      if (!clamped.text) {
+        break;
+      }
       if (
         !pushEntry(
           {
-            type: "text",
-            text,
-            style: { fontSize: 10, fill: "#1F2937" },
+            type: "blockquote",
+            text: clamped.text,
+            style: { fontSize: 11, fill: "#57606A" },
           },
-          estimateCanvasUnitsFromText(text, charsPerLine)
+          clamped.units
         )
       ) {
         break;
@@ -586,11 +1261,31 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
 
     if (type === "list" && Array.isArray(block.items)) {
       const orderedCounters = {};
+      const rootStart =
+        Number.isFinite(Number(block.start)) && Number(block.start) > 0
+          ? Number(block.start)
+          : 1;
+      if (block.ordered) {
+        orderedCounters[1] = rootStart - 1;
+      }
       for (const item of block.items) {
         const normalized = readListItem(item);
         const indent = "  ".repeat(Math.max(0, normalized.depth - 1));
-        let prefix = listBulletForDepth(normalized.depth);
-        if (block.ordered) {
+        const ordered =
+          typeof normalized.ordered === "boolean"
+            ? normalized.ordered
+            : Boolean(block.ordered);
+        const standaloneLink = extractStandaloneMarkdownLink(normalized.content);
+        let prefix = normalized.task
+          ? normalized.task.checked
+            ? "☑"
+            : "☐"
+          : listBulletForDepth(normalized.depth);
+        if (!normalized.task && ordered) {
+          if (typeof orderedCounters[normalized.depth] !== "number") {
+            orderedCounters[normalized.depth] =
+              normalized.depth === 1 ? rootStart - 1 : 0;
+          }
           orderedCounters[normalized.depth] = (orderedCounters[normalized.depth] || 0) + 1;
           for (const depthKey of Object.keys(orderedCounters)) {
             if (Number(depthKey) > normalized.depth) {
@@ -599,15 +1294,25 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
           }
           prefix = `${orderedCounters[normalized.depth]}.`;
         }
-        const line = `${indent}${prefix} ${stripInlineMarkdown(normalized.content)}`;
+        const line = `${indent}${prefix} ${stripInlineMarkdown(
+          standaloneLink ? standaloneLink.label : normalized.content
+        )}`;
+        const remainingUnits = Math.max(1, maxUnits - usedUnits);
+        const clamped = clampCanvasTextContent(line, charsPerLine, remainingUnits);
+        if (!clamped.text) {
+          break;
+        }
         if (
           !pushEntry(
             {
               type: "text",
-              text: line,
-              style: { fontSize: 10, fill: "#1F2937" },
+              text: clamped.text,
+              style: {
+                fontSize: 11,
+                fill: standaloneLink ? "#0969DA" : "#1F2328",
+              },
             },
-            estimateCanvasUnitsFromText(line, charsPerLine)
+            clamped.units
           )
         ) {
           break;
@@ -640,16 +1345,24 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
       }
 
       const fallback = stripInlineMarkdown(block.content || "");
+      const clamped = clampCanvasTextContent(
+        fallback,
+        charsPerLine,
+        Math.max(1, maxUnits - usedUnits)
+      );
+      if (!clamped.text) {
+        break;
+      }
       if (
         !pushEntry(
-          {
-            type: "text",
-            text: fallback,
-            style: { fontSize: 9, fill: "#334155" },
-          },
-          estimateCanvasUnitsFromText(fallback, charsPerLine)
-        )
-      ) {
+            {
+              type: "text",
+              text: clamped.text,
+              style: { fontSize: 10, fill: "#57606A" },
+            },
+            clamped.units
+          )
+        ) {
         break;
       }
       continue;
@@ -678,30 +1391,46 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
             : "txt";
       const content = String(block.content || "");
       const payload = `[${language}]\n${content}`;
+      const clamped = clampCanvasTextContent(
+        payload,
+        charsPerLine,
+        Math.max(1, maxUnits - usedUnits)
+      );
+      if (!clamped.text) {
+        break;
+      }
       if (
         !pushEntry(
-          {
-            type: "code",
-            text: payload,
-            style: { fontSize: 9, fill: "#0F172A" },
-          },
-          estimateCanvasUnitsFromText(payload, charsPerLine)
-        )
-      ) {
+            {
+              type: "code",
+              text: clamped.text,
+              style: { fontSize: 10, fill: "#1F2328" },
+            },
+            clamped.units
+          )
+        ) {
         break;
       }
       continue;
     }
 
     const fallback = stripInlineMarkdown(block?.content || "");
+    const clamped = clampCanvasTextContent(
+      fallback,
+      charsPerLine,
+      Math.max(1, maxUnits - usedUnits)
+    );
+    if (!clamped.text) {
+      break;
+    }
     if (
       !pushEntry(
         {
           type: "text",
-          text: fallback,
-          style: { fontSize: 10, fill: "#1F2937" },
+          text: clamped.text,
+          style: { fontSize: 11, fill: "#1F2328" },
         },
-        estimateCanvasUnitsFromText(fallback, charsPerLine)
+        clamped.units
       )
     ) {
       break;
@@ -712,25 +1441,37 @@ function buildCanvasPreviewEntries(blocks, options = {}) {
     out.push({
       type: "text",
       text: "…",
-      style: { fontSize: 10, fill: "#64748B" },
+      style: { fontSize: 10, fill: "#57606A" },
     });
   }
 
   return out;
 }
 
-function renderCanvasPreviewEntry(entry, previewPanelWidth) {
+function renderCanvasPreviewEntry(entry, previewContentWidth) {
   if (entry?.type === "divider") {
     return h(AutoLayout, {
-      width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
+      width: previewContentWidth,
       height: CANVAS_LAYOUT.divider.thickness,
-      fill: "#CBD5E1",
+      fill: "#D0D7DE",
     });
+  }
+
+  if (entry?.type === "blockquote") {
+    return h(
+      Text,
+      {
+        fontSize: entry?.style?.fontSize || 11,
+        fill: entry?.style?.fill || "#57606A",
+        width: previewContentWidth,
+      },
+      `│ ${String(entry?.text || "")}`
+    );
   }
 
   if (entry?.type === "table" && Array.isArray(entry.header)) {
     const colCount = Math.max(1, entry.header.length);
-    const tableWidth = previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal;
+    const tableWidth = previewContentWidth;
     const cellWidth = Math.max(56, Math.floor(tableWidth / colCount));
     const renderRow = (cells, isHeader) =>
       h(
@@ -739,7 +1480,7 @@ function renderCanvasPreviewEntry(entry, previewPanelWidth) {
           direction: "horizontal",
           spacing: CANVAS_LAYOUT.table.rowSpacing,
           width: tableWidth,
-          fill: isHeader ? "#F1F5F9" : "#FFFFFF",
+          fill: isHeader ? "#F6F8FA" : "#FFFFFF",
         },
         ...cells.map((cell) =>
           h(
@@ -750,15 +1491,15 @@ function renderCanvasPreviewEntry(entry, previewPanelWidth) {
                 vertical: CANVAS_LAYOUT.table.cellPaddingVertical,
                 horizontal: CANVAS_LAYOUT.table.cellPaddingHorizontal,
               },
-              stroke: "#CBD5E1",
+              stroke: "#D0D7DE",
               strokeWidth: CANVAS_LAYOUT.table.borderWidth,
             },
             h(
               Text,
               {
-                fontSize: isHeader ? 9 : 8,
+                fontSize: isHeader ? 10 : 9,
                 fontWeight: isHeader ? 600 : 400,
-                fill: "#0F172A",
+                fill: "#1F2328",
                 width:
                   cellWidth -
                   CANVAS_LAYOUT.table.cellPaddingHorizontal * 2,
@@ -789,26 +1530,61 @@ function renderCanvasPreviewEntry(entry, previewPanelWidth) {
   }
 
   if (entry?.type === "code") {
-    const codeBlockWidth = previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal;
+    const codeBlockWidth = previewContentWidth;
     return h(
       AutoLayout,
       {
         direction: "vertical",
         width: codeBlockWidth,
         padding: CANVAS_LAYOUT.code.padding,
-        fill: "#F8FAFC",
-        stroke: "#CBD5E1",
+        fill: "#F6F8FA",
+        stroke: "#D0D7DE",
         strokeWidth: CANVAS_LAYOUT.code.borderWidth,
         cornerRadius: CANVAS_LAYOUT.code.cornerRadius,
       },
       h(
         Text,
         {
-          fontSize: 9,
-          fill: entry?.style?.fill || "#0F172A",
+          fontSize: 10,
+          fill: entry?.style?.fill || "#1F2328",
           width: codeBlockWidth - CANVAS_LAYOUT.code.padding * 2,
         },
         String(entry?.text || "")
+      )
+    );
+  }
+
+  if (entry?.type === "richtext" && Array.isArray(entry?.lines)) {
+    const lineSpacing = 2;
+    return h(
+      AutoLayout,
+      {
+        direction: "vertical",
+        width: previewContentWidth,
+        spacing: lineSpacing,
+      },
+      ...entry.lines.map((line) =>
+        h(
+          AutoLayout,
+          {
+            direction: "horizontal",
+            width: previewContentWidth,
+            spacing: 4,
+            wrap: true,
+          },
+          ...line.map((segment) =>
+            h(
+              Text,
+              {
+                fontSize: entry?.style?.fontSize || 11,
+                fontWeight: segment?.bold ? 700 : 400,
+                italic: Boolean(segment?.italic),
+                fill: segment?.link ? "#0969DA" : entry?.style?.fill || "#1F2328",
+              },
+              String(segment?.text || "")
+            )
+          )
+        )
       )
     );
   }
@@ -818,8 +1594,8 @@ function renderCanvasPreviewEntry(entry, previewPanelWidth) {
     {
       fontSize: entry?.style?.fontSize || 10,
       fontWeight: entry?.style?.fontWeight || 400,
-      fill: entry?.style?.fill || "#2F2F2F",
-      width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
+      fill: entry?.style?.fill || "#1F2328",
+      width: previewContentWidth,
     },
     String(entry?.text || "")
   );
@@ -996,8 +1772,8 @@ function GitHubPreviewWidget() {
       const patStore = await getRuntimePatStore();
       const pipeline = await createOrRefreshEmbedFromUrl({
         url: normalizedUrl,
-        currentEmbedBlock: embedBlock,
-        currentSnapshot: embedSnapshot,
+        currentEmbedBlock: null,
+        currentSnapshot: null,
         patStore,
         mode,
       });
@@ -1008,10 +1784,14 @@ function GitHubPreviewWidget() {
           progressTimer = null;
         }
         if (pipeline.value?.embedBlock) {
-          setEmbedBlock(pipeline.value.embedBlock);
-        }
-        if (pipeline.value?.snapshot) {
-          setEmbedSnapshot(pipeline.value.snapshot);
+          const safeEmbedBlock = toCanvasSafeEmbedBlock(pipeline.value.embedBlock);
+          if (safeEmbedBlock) {
+            setEmbedBlock(safeEmbedBlock);
+            setEmbedSnapshot(null);
+          } else {
+            setEmbedBlock(null);
+            setEmbedSnapshot(null);
+          }
         }
 
         const runtimeError = resolveRuntimeError(pipeline.error, pipeline.auth);
@@ -1051,8 +1831,14 @@ function GitHubPreviewWidget() {
       }
 
       setLastUrl(normalizedUrl);
-      setEmbedBlock(pipeline.value.embedBlock);
-      setEmbedSnapshot(pipeline.value.snapshot);
+      const safeEmbedBlock = toCanvasSafeEmbedBlock(pipeline.value.embedBlock);
+      if (safeEmbedBlock) {
+        setEmbedBlock(safeEmbedBlock);
+        setEmbedSnapshot(null);
+      } else {
+        setEmbedBlock(null);
+        setEmbedSnapshot(null);
+      }
       setAuthContext(null);
 
       const lastResult = buildLastResult(pipeline.value.snapshot, pipeline.value.embedBlock);
@@ -1175,22 +1961,12 @@ function GitHubPreviewWidget() {
         tooltip: "Width +",
         propertyName: PROPERTY_ACTION.WIDTH_INC,
       },
-      {
-        itemType: "action",
-        tooltip: "Height -",
-        propertyName: PROPERTY_ACTION.HEIGHT_DEC,
-      },
-      {
-        itemType: "action",
-        tooltip: "Height +",
-        propertyName: PROPERTY_ACTION.HEIGHT_INC,
-      },
     ],
     async (event) => {
       const propertyName = typeof event?.propertyName === "string" ? event.propertyName : "";
 
       if (propertyName === PROPERTY_ACTION.OPEN_URL || propertyName === "open-url") {
-        ensureUiSessionTask();
+        const uiTask = ensureUiSessionTask();
 
         await (async () => {
           try {
@@ -1200,16 +1976,16 @@ function GitHubPreviewWidget() {
               error && typeof error.message === "string" ? error.message : String(error);
             setStatus("Could not open URL input");
             figma.notify(`Could not open URL input: ${detail}`, { error: true });
+            endUiSessionTask();
             return;
           }
 
           // Give the iframe a tick to bootstrap before first context push.
           await Promise.resolve();
           postWidgetContextToUi();
-          figma.notify("URL input opened.");
           void maybeRunAutoRefresh("open-url");
         })();
-        return uiSessionPromise || Promise.resolve();
+        return uiTask;
       }
 
       if (propertyName === PROPERTY_ACTION.REFRESH_NOW || propertyName === "refresh-now") {
@@ -1228,9 +2004,7 @@ function GitHubPreviewWidget() {
 
       if (
         propertyName === PROPERTY_ACTION.WIDTH_DEC ||
-        propertyName === PROPERTY_ACTION.WIDTH_INC ||
-        propertyName === PROPERTY_ACTION.HEIGHT_DEC ||
-        propertyName === PROPERTY_ACTION.HEIGHT_INC
+        propertyName === PROPERTY_ACTION.WIDTH_INC
       ) {
         const baseSize =
           canvasSize && typeof canvasSize === "object"
@@ -1242,18 +2016,11 @@ function GitHubPreviewWidget() {
             : propertyName === PROPERTY_ACTION.WIDTH_DEC
               ? -CANVAS_SIZE_LIMITS.widthStep
               : 0;
-        const heightDelta =
-          propertyName === PROPERTY_ACTION.HEIGHT_INC
-            ? CANVAS_SIZE_LIMITS.heightStep
-            : propertyName === PROPERTY_ACTION.HEIGHT_DEC
-              ? -CANVAS_SIZE_LIMITS.heightStep
-              : 0;
         const nextSize = clampCanvasSize({
           width: baseSize.width + widthDelta,
-          height: baseSize.height + heightDelta,
         });
         setCanvasSize(nextSize);
-        setStatus(`Canvas resized: ${nextSize.width} × ${nextSize.height}`);
+        setStatus(`Canvas width resized: ${nextSize.width}`);
         return;
       }
     }
@@ -1271,7 +2038,6 @@ function GitHubPreviewWidget() {
         lastUiReadyNonce = lastUiOpenNonce;
         setStatus("UI ready");
         postWidgetContextToUi();
-        figma.notify("UI initialized.");
         return;
       }
 
@@ -1369,115 +2135,107 @@ function GitHubPreviewWidget() {
       autoRefreshBootstrapped = true;
       void maybeRunAutoRefresh("resume");
     }
-
-    return () => {
-      figma.ui.onmessage = undefined;
-    };
   });
 
   const effectiveCanvasSize =
     canvasSize && typeof canvasSize === "object" ? clampCanvasSize(canvasSize) : clampCanvasSize();
+  const sourceOwner = toSafeString(embedBlock?.source?.owner, "RepoOwner");
+  const sourceRepo = toSafeString(embedBlock?.source?.repo, "RepoName");
+  const ownerRepo = `${sourceOwner}/${sourceRepo}`;
+  const sourcePath = toSafeString(embedBlock?.source?.path, "FileName.md");
+  const fileNameParts = String(sourcePath || "")
+    .split("/")
+    .filter(Boolean);
+  const fileName = fileNameParts[fileNameParts.length - 1] || "FileName.md";
+  const repoLabel = `${ownerRepo} · ${sourcePath}`;
   const previewSummary = buildUiPreviewTextFromBlock(embedBlock, {
     maxChars: 200_000,
   });
-  const previewPanelWidth = Math.max(
+  const hasUrl = typeof lastUrl === "string" && lastUrl.trim().length > 0;
+  const panelWidth = Math.max(
     200,
     effectiveCanvasSize.width - CANVAS_LAYOUT.root.padding * 2
   );
-  const previewViewportHeight = Math.max(180, effectiveCanvasSize.height - 220);
+  const previewPanelHeight = hasUrl ? null : CANVAS_LAYOUT.previewPanel.emptyStateHeight;
+  const previewContentWidth = Math.max(
+    120,
+    panelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal
+  );
+  const safeCanvasBlocks = Array.isArray(embedBlock?.preview?.blocks)
+    ? embedBlock.preview.blocks
+    : [];
+  const previewBudgetHeight = hasUrl
+    ? estimateCanvasPreviewBudgetHeight(safeCanvasBlocks)
+    : CANVAS_LAYOUT.previewPanel.emptyStateHeight;
+  const previewContentHeight = Math.max(
+    hasUrl ? 120 : 36,
+    previewBudgetHeight - CANVAS_LAYOUT.previewPanel.padding * 2
+  );
+  const canvasPreviewEntries = hasUrl
+    ? buildCanvasPreviewEntries(safeCanvasBlocks, {
+      width: previewContentWidth,
+      height: previewContentHeight,
+    })
+    : [];
+  const hasCanvasPreviewEntries = canvasPreviewEntries.length > 0;
   const canvasPreviewText = fitPreviewTextForCanvas(previewSummary, {
-    width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
-    height: previewViewportHeight,
+    width: previewContentWidth,
+    height: previewContentHeight,
   });
-  const canvasPreviewEntries = buildCanvasPreviewEntries(embedBlock?.preview?.blocks, {
-    width: previewPanelWidth - CANVAS_LAYOUT.previewPanel.insetHorizontal,
-    height: previewViewportHeight,
-  });
-  const lastResult = buildLastResult(embedSnapshot, embedBlock);
-  const previewChildren =
-    canvasPreviewEntries.length > 0
-      ? [
-        h(
-          AutoLayout,
-          {
-            direction: "vertical",
-            spacing: CANVAS_LAYOUT.previewPanel.spacing,
-            width: previewPanelWidth,
-            height: previewViewportHeight,
-            fill: "#FAFAFA",
-            stroke: "#E6E6E6",
-            cornerRadius: CANVAS_LAYOUT.previewPanel.cornerRadius,
-            padding: CANVAS_LAYOUT.previewPanel.padding,
-          },
-          ...canvasPreviewEntries.map((entry) =>
-            renderCanvasPreviewEntry(entry, previewPanelWidth)
-          )
-        ),
-      ]
-      : [
-        h(
-          Text,
-          { fontSize: 10, fill: "#8B8B8B" },
-          canvasPreviewText.trim().length > 0 ? canvasPreviewText : "Preview: pending"
-        ),
-      ];
-
-  const children = [
-    h(Text, { fontSize: 12, fontWeight: 600 }, "GitHub Preview Widget"),
-    h(Text, { fontSize: 11, fill: "#5C5C5C" }, status),
-    h(
-      Text,
-      { fontSize: 10, fill: "#7A7A7A" },
-      lastUrl ? `Last URL: ${lastUrl}` : "No URL captured yet"
-    ),
-    h(
-      Text,
-      { fontSize: 10, fill: "#7A7A7A" },
-      embedBlock
-        ? `Embed: ${embedBlock.sections.header.ownerRepo} · ${embedBlock.sections.header.path}`
-        : "Embed: pending"
-    ),
-    h(
-      Text,
-      { fontSize: 10, fill: "#7A7A7A" },
-      embedBlock
-        ? `Sync: ${embedBlock.sections.header.statusBadge.label} · ${embedBlock.sections.header.lastSync}`
-        : "Sync: idle"
-    ),
-    h(
-      Text,
-      { fontSize: 10, fill: "#8B8B8B" },
-      embedSnapshot
-        ? `Warnings: ${embedSnapshot.warningCount || 0} · Progressive: ${embedSnapshot.render?.progressive ? "yes" : "no"}`
-        : "Warnings: 0 · Progressive: no"
-    ),
-    h(
-      Text,
-      { fontSize: 10, fill: "#8B8B8B" },
-      `Last result: ${lastResult.status || "idle"} (${lastResult.mode || "manual"})`
-    ),
-    h(
-      Text,
-      { fontSize: 10, fill: "#8B8B8B" },
-      `Canvas: ${effectiveCanvasSize.width} × ${effectiveCanvasSize.height}`
-    ),
-    h(Text, { fontSize: 10, fontWeight: 600, fill: "#1F1F1F" }, "Preview"),
-    ...previewChildren,
-  ];
+  const hasPreviewText = Boolean(canvasPreviewText.trim());
+  const fallbackPreviewLabel =
+    !hasUrl
+      ? "Set a GitHub URL to preview the document or file."
+      : hasPreviewText
+        ? canvasPreviewText
+        : "Preview unavailable for this Markdown content.";
 
   return h(
     AutoLayout,
     {
       direction: "vertical",
       width: effectiveCanvasSize.width,
-      height: effectiveCanvasSize.height,
       spacing: CANVAS_LAYOUT.root.spacing,
       padding: CANVAS_LAYOUT.root.padding,
       fill: "#FFFFFF",
-      stroke: "#D9D9D9",
-      cornerRadius: CANVAS_LAYOUT.root.cornerRadius,
     },
-    ...children
+    h(Text, { fontSize: 11, fill: "#57606A" }, repoLabel),
+    h(Text, { fontSize: 36, fontWeight: 700, fill: "#1F2328" }, fileName),
+    h(
+      AutoLayout,
+      {
+        direction: "vertical",
+        width: panelWidth,
+        spacing: CANVAS_LAYOUT.previewPanel.spacing,
+        padding: CANVAS_LAYOUT.previewPanel.padding,
+        ...(previewPanelHeight ? { height: previewPanelHeight } : {}),
+        fill: "#FFFFFF",
+        cornerRadius: CANVAS_LAYOUT.previewPanel.cornerRadius,
+        stroke: "#D0D7DE",
+        strokeWidth: 1,
+      },
+      !hasUrl || !hasCanvasPreviewEntries
+        ? h(
+          Text,
+          {
+            fontSize: 11,
+            fill: "#656D76",
+            width: previewContentWidth,
+          },
+          sanitizeCanvasText(fallbackPreviewLabel, 2_400)
+        )
+        : h(
+          AutoLayout,
+          {
+            direction: "vertical",
+            width: previewContentWidth,
+            spacing: 8,
+          },
+          ...canvasPreviewEntries.map((entry) =>
+            renderCanvasPreviewEntry(entry, previewContentWidth)
+          )
+        )
+    )
   );
 }
 

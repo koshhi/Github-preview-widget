@@ -164,3 +164,58 @@ test("updates in-place when URL changes on same instance", async () => {
   assert.equal(result.value.embedBlock.source.path, "docs/NEW.md");
   assert.equal(result.value.embedBlock.sourceKey, "octocat/hello-world@main:docs/NEW.md");
 });
+
+test("preserves GFM list metadata in normalized preview blocks", async () => {
+  const url = "https://github.com/octocat/hello-world/blob/main/docs/LISTS.md";
+
+  const result = await createOrRefreshEmbedFromUrl(
+    {
+      url,
+      now: "2026-03-06T14:30:00.000Z",
+    },
+    {
+      readGithubFileWithAuth: async () => ({
+        ok: true,
+        value: {
+          sourceKey: "octocat/hello-world@main:docs/LISTS.md",
+          source: {
+            owner: "octocat",
+            repo: "hello-world",
+            ref: "main",
+            path: "docs/LISTS.md",
+            extension: "md",
+          },
+          content: "3. third\n4. fourth",
+        },
+      }),
+      renderFilePreview: () => ({
+        ok: true,
+        value: {
+          kind: "markdown",
+          blocks: [
+            {
+              type: "list",
+              ordered: true,
+              start: 3,
+              items: [
+                { content: "third", depth: 1, ordered: true },
+                { content: "fourth", depth: 1, ordered: true },
+              ],
+            },
+          ],
+          warnings: [],
+          truncated: false,
+          progressive: false,
+          metrics: { firstPreviewMs: 41, cacheHit: false },
+        },
+      }),
+    }
+  );
+
+  assert.equal(result.ok, true);
+  const list = result.value.embedBlock.preview.blocks[0];
+  assert.equal(list.type, "list");
+  assert.equal(list.ordered, true);
+  assert.equal(list.start, 3);
+  assert.equal(list.items[0].content, "third");
+});

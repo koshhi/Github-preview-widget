@@ -124,3 +124,56 @@ test("updates same widget instance while refreshing snapshot for new URL", async
     "https://github.com/octocat/hello-world/blob/main/docs/NEW.md"
   );
 });
+
+test("snapshot render metadata reflects markdown block count after refresh", async () => {
+  const initial = createSeedEmbed({
+    url: "https://github.com/octocat/hello-world/blob/main/docs/README.md",
+  });
+  assert.equal(initial.ok, true);
+
+  const updated = await createOrRefreshEmbedFromUrl(
+    {
+      url: "https://github.com/octocat/hello-world/blob/main/docs/README.md",
+      currentEmbedBlock: initial.value.embedBlock,
+      now: "2026-03-06T14:40:00.000Z",
+    },
+    {
+      readGithubFileWithAuth: async () => ({
+        ok: true,
+        value: {
+          sourceKey: "octocat/hello-world@main:docs/README.md",
+          source: {
+            owner: "octocat",
+            repo: "hello-world",
+            ref: "main",
+            path: "docs/README.md",
+            extension: "md",
+          },
+          content: "# Title",
+        },
+      }),
+      renderFilePreview: () => ({
+        ok: true,
+        value: {
+          kind: "markdown",
+          blocks: [
+            { type: "heading", depth: 1, content: "Title" },
+            {
+              type: "list",
+              ordered: false,
+              items: [{ content: "item", depth: 1 }],
+            },
+          ],
+          warnings: [],
+          truncated: false,
+          progressive: false,
+          metrics: { firstPreviewMs: 45, cacheHit: false },
+        },
+      }),
+    }
+  );
+
+  assert.equal(updated.ok, true);
+  assert.equal(updated.value.snapshot.render.kind, "markdown");
+  assert.equal(updated.value.snapshot.render.blockCount, 2);
+});

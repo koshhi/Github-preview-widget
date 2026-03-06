@@ -1,145 +1,306 @@
+const { marked } = require("marked");
 const { RENDER_KIND } = require("./types.ts");
 const { renderMermaidBlocks } = require("./renderMermaidBlocks.ts");
+
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+  mangle: false,
+  headerIds: false,
+  smartypants: false,
+});
 
 function isHtmlLike(line) {
   return /<[^>]+>/.test(line);
 }
 
-function isTableDivider(line) {
-  return /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(line.trim());
+function serializeInlineTokens(tokens) {
+  if (!Array.isArray(tokens) || tokens.length === 0) {
+    return "";
+  }
+
+  const out = [];
+  for (const token of tokens) {
+    const type = typeof token?.type === "string" ? token.type : "";
+
+    if (type === "text" || type === "escape") {
+      out.push(String(token.text || ""));
+      continue;
+    }
+
+    if (type === "codespan") {
+      out.push(`\`${String(token.text || "")}\``);
+      continue;
+    }
+
+    if (type === "strong") {
+      out.push(`**${serializeInlineTokens(token.tokens)}**`);
+      continue;
+    }
+
+    if (type === "em") {
+      out.push(`*${serializeInlineTokens(token.tokens)}*`);
+      continue;
+    }
+
+    if (type === "del") {
+      out.push(`~~${serializeInlineTokens(token.tokens)}~~`);
+      continue;
+    }
+
+    if (type === "br") {
+      out.push("\n");
+      continue;
+    }
+
+    if (type === "link") {
+      const href = String(token.href || "").trim();
+      const text = serializeInlineTokens(token.tokens) || String(token.text || href);
+      if (href) {
+        out.push(`[${text}](${href})`);
+      } else {
+        out.push(text);
+      }
+      continue;
+    }
+
+    if (type === "image") {
+      const alt = String(token.text || "").trim();
+      const href = String(token.href || "").trim();
+      if (href) {
+        out.push(`![${alt}](${href})`);
+      }
+      continue;
+    }
+
+    if (type === "html") {
+      out.push(String(token.raw || token.text || ""));
+      continue;
+    }
+
+    if (Array.isArray(token?.tokens) && token.tokens.length > 0) {
+      out.push(serializeInlineTokens(token.tokens));
+      continue;
+    }
+
+    if (typeof token?.text === "string") {
+      out.push(token.text);
+      continue;
+    }
+
+    if (typeof token?.raw === "string") {
+      out.push(token.raw);
+    }
+  }
+
+  return out.join("");
 }
 
-function isListLine(line) {
-  return /^\s*(?:[-*+]|\d+\.)\s+/.test(String(line || ""));
+function renderTableDividerCell(align) {
+  if (align === "left") return ":---";
+  if (align === "right") return "---:";
+  if (align === "center") return ":---:";
+  return "---";
 }
 
-function getListDepth(rawLine) {
-  const leading = String(rawLine || "")
-    .match(/^\s*/)?.[0]
-    ?.replace(/\t/g, "  ").length || 0;
-  return Math.max(1, Math.floor(leading / 2) + 1);
+function toMarkdownTable(token) {
+  const header = Array.isArray(token?.header) ? token.header : [];
+  const rows = Array.isArray(token?.rows) ? token.rows : [];
+  if (header.length === 0) {
+    return "";
+  }
+
+  const headerCells = header.map((cell) =>
+    serializeInlineTokens(cell?.tokens || []).trim() || String(cell?.text || "").trim()
+  );
+  const align = Array.isArray(token?.align) ? token.align : [];
+  const dividerCells = headerCells.map((_, index) => renderTableDividerCell(align[index]));
+
+  const lineRows = rows.map((row) => {
+    const cells = Array.isArray(row) ? row : [];
+    const out = [];
+    for (let index = 0; index < headerCells.length; index += 1) {
+      const cell = cells[index];
+      const text =
+        serializeInlineTokens(cell?.tokens || []).trim() || String(cell?.text || "").trim();
+      out.push(text);
+    }
+    return out;
+  });
+
+  const lines = [
+    `| ${headerCells.join(" | ")} |`,
+    `| ${dividerCells.join(" | ")} |`,
+    ...lineRows.map((cells) => `| ${cells.join(" | ")} |`),
+  ];
+
+  return lines.join("\n");
 }
 
-function stripListMarker(rawLine) {
-  return String(rawLine || "").replace(/^\s*(?:[-*+]|\d+\.)\s+/, "").trim();
+function normalizeListItemContent(item) {
+  const tokenText = serializeInlineTokens(item?.tokens || []).trim();
+  const rawText = String(item?.text || "").trim();
+  const content = tokenText || rawText;
+  return content.replace(/\r?\n+/g, "\n").trim();
 }
 
-function isHorizontalRuleLine(line) {
-  const trimmed = String(line || "").trim();
-  return /^([-*_])(?:\s*\1){2,}$/.test(trimmed);
+function collectListItems(token, depth, out) {
+  const items = Array.isArray(token?.items) ? token.items : [];
+  for (const item of items) {
+    const content = normalizeListItemContent(item);
+    if (content) {
+      const normalizedItem = {
+        content,
+        depth,
+        ordered:
+          typeof token?.ordered === "boolean" ? token.ordered : false,
+      };
+      if (item?.task === true) {
+        normalizedItem.task = { checked: Boolean(item.checked) };
+      }
+      out.push(normalizedItem);
+    }
+
+    for (const child of Array.isArray(item?.tokens) ? item.tokens : []) {
+      if (child?.type === "list") {
+        collectListItems(child, depth + 1, out);
+      }
+    }
+  }
 }
 
 function parseMarkdownBlocks(markdown) {
-  const lines = String(markdown || "").split(/\r?\n/);
+  const source = String(markdown || "");
   const blocks = [];
   const warnings = [];
-  let index = 0;
 
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trim();
+  try {
+    const tokens = marked.lexer(source, { gfm: true });
+    for (const token of tokens) {
+      const type = typeof token?.type === "string" ? token.type : "";
 
-    if (!trimmed) {
-      index += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith("```")) {
-      const language = trimmed.slice(3).trim().toLowerCase() || "text";
-      index += 1;
-      const codeLines = [];
-      while (index < lines.length && !lines[index].trim().startsWith("```")) {
-        codeLines.push(lines[index]);
-        index += 1;
-      }
-      if (index < lines.length && lines[index].trim().startsWith("```")) {
-        index += 1;
-      } else {
-        warnings.push("Bloque de código sin cierre detectado. Se degradó al final del documento.");
+      if (type === "space") {
+        continue;
       }
 
-      blocks.push({
-        type: "code",
-        language,
-        content: codeLines.join("\n"),
-      });
-      continue;
-    }
-
-    if (/^#{1,6}\s+/.test(trimmed)) {
-      const depth = trimmed.match(/^#{1,6}/)[0].length;
-      blocks.push({
-        type: "heading",
-        depth,
-        content: trimmed.slice(depth).trim(),
-      });
-      index += 1;
-      continue;
-    }
-
-    if (isHorizontalRuleLine(trimmed)) {
-      blocks.push({
-        type: "divider",
-      });
-      index += 1;
-      continue;
-    }
-
-    if (isListLine(line)) {
-      const ordered = /^\s*\d+\.\s+/.test(line);
-      const items = [];
-      while (index < lines.length && isListLine(lines[index])) {
-        items.push({
-          content: stripListMarker(lines[index]),
-          depth: getListDepth(lines[index]),
+      if (type === "heading") {
+        blocks.push({
+          type: "heading",
+          depth: Number(token.depth) || 1,
+          content:
+            serializeInlineTokens(token.tokens || []).trim() ||
+            String(token.text || "").trim(),
         });
-        index += 1;
+        continue;
       }
-      blocks.push({
-        type: "list",
-        ordered,
-        items,
-      });
-      continue;
-    }
 
-    const nextLine = lines[index + 1] || "";
-    if (line.includes("|") && isTableDivider(nextLine)) {
-      const tableLines = [line, nextLine];
-      index += 2;
-      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
-        tableLines.push(lines[index]);
-        index += 1;
+      if (type === "paragraph" || type === "text") {
+        const content =
+          serializeInlineTokens(token.tokens || []).trim() ||
+          String(token.text || "").trim();
+        if (content) {
+          blocks.push({
+            type: "paragraph",
+            content,
+            meta: {
+              htmlEscaped: isHtmlLike(content),
+            },
+          });
+        }
+        continue;
       }
+
+      if (type === "blockquote") {
+        const content = String(token.text || "").trim();
+        if (content) {
+          blocks.push({
+            type: "blockquote",
+            content,
+          });
+        }
+        continue;
+      }
+
+      if (type === "list") {
+        const items = [];
+        collectListItems(token, 1, items);
+        if (items.length > 0) {
+          blocks.push({
+            type: "list",
+            ordered: Boolean(token.ordered),
+            start:
+              Number.isFinite(Number(token.start)) && Number(token.start) > 0
+                ? Number(token.start)
+                : 1,
+            items,
+          });
+        }
+        continue;
+      }
+
+      if (type === "table") {
+        const tableMarkdown = toMarkdownTable(token);
+        if (tableMarkdown) {
+          blocks.push({
+            type: "table",
+            content: tableMarkdown,
+          });
+        }
+        continue;
+      }
+
+      if (type === "hr") {
+        blocks.push({
+          type: "divider",
+        });
+        continue;
+      }
+
+      if (type === "code") {
+        blocks.push({
+          type: "code",
+          language: String(token.lang || "").toLowerCase() || "text",
+          content: String(token.text || ""),
+        });
+        continue;
+      }
+
+      if (type === "html") {
+        const content = String(token.raw || token.text || "").trim();
+        if (content) {
+          blocks.push({
+            type: "paragraph",
+            content,
+            meta: {
+              htmlEscaped: true,
+            },
+          });
+        }
+        continue;
+      }
+
+      const fallback = String(token?.raw || token?.text || "").trim();
+      if (fallback) {
+        blocks.push({
+          type: "paragraph",
+          content: fallback,
+          meta: {
+            htmlEscaped: isHtmlLike(fallback),
+          },
+        });
+      }
+    }
+  } catch (error) {
+    warnings.push("No se pudo parsear markdown GFM completo; se muestra fallback textual.");
+    if (source.trim()) {
       blocks.push({
-        type: "table",
-        content: tableLines.join("\n"),
+        type: "paragraph",
+        content: source.trim(),
+        meta: {
+          htmlEscaped: isHtmlLike(source),
+        },
       });
-      continue;
     }
-
-    const paragraphLines = [line];
-    index += 1;
-    while (
-      index < lines.length &&
-      lines[index].trim() &&
-      !lines[index].trim().startsWith("```") &&
-      !/^#{1,6}\s+/.test(lines[index].trim()) &&
-      !isListLine(lines[index]) &&
-      !(lines[index].includes("|") && isTableDivider(lines[index + 1] || ""))
-    ) {
-      paragraphLines.push(lines[index]);
-      index += 1;
-    }
-
-    const paragraph = paragraphLines.join("\n").trim();
-    blocks.push({
-      type: "paragraph",
-      content: paragraph,
-      meta: {
-        htmlEscaped: isHtmlLike(paragraph),
-      },
-    });
   }
 
   return { blocks, warnings };

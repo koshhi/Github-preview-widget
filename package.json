@@ -14,5 +14,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "marked": "^4.3.0"
+  }
 }
